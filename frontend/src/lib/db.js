@@ -27,6 +27,12 @@ function unwrap({ data, error }) {
   return data;
 }
 
+// Notify the app (e.g. the sidebar collection counts) that titles moved between
+// collections or were added/removed, so listeners can reload without a refresh.
+function notifyLibraryChanged() {
+  try { window.dispatchEvent(new Event("hanabi:library-changed")); } catch { /* SSR / no window */ }
+}
+
 // best-effort activity log; never throws
 async function logActivity(entry) {
   try {
@@ -155,6 +161,7 @@ export async function createTitle(payload) {
     title: row.title, title_id: row.id, category_id: row.category_id,
     category_name: cat.data?.name || "",
   });
+  notifyLibraryChanged();
   return row;
 }
 
@@ -175,6 +182,8 @@ export async function updateTitle(id, patch) {
       category_name: catName, extra: { from: before.progress || 0, to: patch.progress },
     });
   }
+  // Moving a title between collections changes per-collection counts.
+  if ("category_id" in patch && patch.category_id !== before.category_id) notifyLibraryChanged();
   return row;
 }
 
@@ -182,6 +191,7 @@ export async function deleteTitle(id) {
   const before = unwrap(await supabase.from("titles").select("title, category_id").eq("id", id).single());
   unwrap(await supabase.from("titles").delete().eq("id", id).select("id").maybeSingle());
   await logActivity({ type: "remove", title: before.title, title_id: id, category_id: before.category_id });
+  notifyLibraryChanged();
   return { ok: true };
 }
 
@@ -258,6 +268,7 @@ export async function actOnSuggestion(id, action, categoryId) {
   }
   unwrap(await supabase.from("suggestions").update({ status: "accepted", title_id: titleId }).eq("id", id).select("id").single());
   await logActivity({ type: "extension_add", title: sug.title, title_id: titleId, category_id: cat.id, category_name: cat.name });
+  notifyLibraryChanged();
   return { ok: true, title_id: titleId };
 }
 
@@ -336,6 +347,7 @@ export async function importAnilist({ username, type = "ANIME", categoryId }) {
       type: "add", title: `AniList import (${imported})`, category_id: categoryId,
       category_name: cat.data?.name || "", extra: { source: "anilist", count: imported },
     });
+    notifyLibraryChanged();
   }
   return { imported, skipped };
 }

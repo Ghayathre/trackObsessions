@@ -45,7 +45,13 @@ export default function Layout({ children }) {
     loadCats();
     loadPending();
     const t = setInterval(loadPending, 20000);
-    return () => clearInterval(t);
+    // Reload collection counts when titles are added/moved/removed anywhere.
+    const onLibraryChange = () => loadCats();
+    window.addEventListener("hanabi:library-changed", onLibraryChange);
+    return () => {
+      clearInterval(t);
+      window.removeEventListener("hanabi:library-changed", onLibraryChange);
+    };
   }, []);
 
   const onCreateCategory = async (name) => {
