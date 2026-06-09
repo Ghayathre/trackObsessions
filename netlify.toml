@@ -1,0 +1,20 @@
+# Netlify deployment for the Hanabi frontend (CRA + craco).
+[build]
+  base = "frontend"
+  command = "yarn build"
+  publish = "build"          # relative to base -> frontend/build
+
+[build.environment]
+  NODE_VERSION = "22"
+  # The Supabase publishable (anon) key is safe to expose; RLS enforces access.
+  # CRA inlines REACT_APP_* at build time. You can instead set these in the
+  # Netlify UI (Site settings -> Environment variables) and delete them here.
+  REACT_APP_SUPABASE_URL = "https://yupganesyypaqhirgmbi.supabase.co"
+  REACT_APP_SUPABASE_ANON_KEY = "sb_publishable_w-x9VX-VQSmH7SGeYZqsCQ_8Uvtvb2X"
+
+# SPA fallback: let React Router handle deep links and refreshes
+# (/u/:username, /c/:id, /settings, /login, …) instead of 404ing.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

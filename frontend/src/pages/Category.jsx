@@ -38,11 +38,14 @@ export default function Category() {
     setCat(cats.find((c) => c.id === id));
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [id, filter]);
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, filter]);
   useEffect(() => {
     const t = setTimeout(load, 250);
     return () => clearTimeout(t);
-    // eslint-disable-next-line
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
 
   const kind = cat?.kind === "reading" ? "reading" : "video";

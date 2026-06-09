@@ -24,7 +24,10 @@ export default function CategoryLinks({ categoryId }) {
     } catch {}
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [categoryId]);
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categoryId]);
 
   const submit = async (e) => {
     e.preventDefault();
