@@ -7,6 +7,8 @@ import CategoryLinks from "../components/CategoryLinks";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
 import { Search, Share2 } from "lucide-react";
+import { motion } from "framer-motion";
+import { Reveal, staggerContainer, staggerItem } from "../lib/motion";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
 
@@ -109,14 +111,22 @@ export default function Category() {
           <p className="text-sm text-muted-foreground mt-1">Tap “Add title” above to start tracking.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+        <motion.div
+          key={`${filter}-${q}`}
+          className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
+          variants={staggerContainer}
+          initial="hidden"
+          animate="show"
+        >
           {items.map((t) => (
-            <MediaCard key={t.id} item={t} kind={kind} onChange={onChange} />
+            <motion.div key={t.id} variants={staggerItem}>
+              <MediaCard item={t} kind={kind} onChange={onChange} />
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       )}
 
-      {cat && <CategoryLinks categoryId={cat.id} />}
+      {cat && <Reveal>{<CategoryLinks categoryId={cat.id} />}</Reveal>}
     </div>
   );
 }

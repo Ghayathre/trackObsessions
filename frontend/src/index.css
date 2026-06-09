@@ -4,6 +4,7 @@
 
 @import url("https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@400,500,700,800,900&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Bungee&family=Outfit:wght@400;500;600;700&family=Sora:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700;800&family=EB+Garamond:wght@400;500;600;700&family=Cinzel+Decorative:wght@400;700;900&family=Cormorant+Garamond:wght@400;500;600;700&family=Orbitron:wght@400;500;700;800&family=JetBrains+Mono:wght@400;500;700&family=Caveat:wght@400;500;600;700&family=Caveat+Brush&family=Shippori+Mincho:wght@400;500;700;800&family=Noto+Serif+JP:wght@400;500;700&family=Press+Start+2P&family=VT323&family=Anton&family=Space+Mono:wght@400;700&family=Italiana&family=Cormorant:wght@400;500;600;700&family=Crimson+Pro:wght@400;500;600;700&display=swap");
 
 :root {
   --font-display: "Cabinet Grotesk", ui-sans-serif, system-ui;
@@ -335,6 +336,117 @@ body {
   * { @apply border-border; }
   body { @apply bg-background text-foreground; }
   h1, h2, h3, h4 { font-family: var(--font-display); letter-spacing: -0.02em; }
+}
+
+/* ---------- STYLE PACKS (typography + form, theme-agnostic) ---------- */
+/* Each style overrides --font-display, --font-body, --radius and may add a body texture. */
+
+.style-default {
+  --font-display: "Cabinet Grotesk", ui-sans-serif, system-ui;
+  --font-body: "Figtree", ui-sans-serif, system-ui;
+  --radius: 0.85rem;
+}
+
+.style-minimalist {
+  --font-display: "Plus Jakarta Sans", ui-sans-serif, system-ui;
+  --font-body: "Plus Jakarta Sans", ui-sans-serif, system-ui;
+  --radius: 0.25rem;
+}
+.style-minimalist h1, .style-minimalist h2, .style-minimalist h3, .style-minimalist h4 { letter-spacing: -0.04em; font-weight: 700; }
+
+.style-retro-arcade {
+  --font-display: "Bungee", "Cabinet Grotesk", cursive;
+  --font-body: "Outfit", ui-sans-serif;
+  --radius: 1.25rem;
+}
+.style-retro-arcade h1, .style-retro-arcade h2 { letter-spacing: 0; }
+.style-retro-arcade body::before {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 40;
+  background-image: repeating-linear-gradient(0deg, transparent 0, transparent 3px, rgba(255,255,255,0.025) 3px, rgba(255,255,255,0.025) 4px);
+}
+
+.style-mid-century {
+  --font-display: "Sora", ui-sans-serif;
+  --font-body: "Sora", ui-sans-serif;
+  --radius: 0.5rem;
+}
+.style-mid-century h1, .style-mid-century h2 { font-weight: 600; letter-spacing: -0.01em; }
+
+.style-vintage-paper {
+  --font-display: "Playfair Display", Georgia, serif;
+  --font-body: "EB Garamond", Georgia, serif;
+  --radius: 0.35rem;
+}
+.style-vintage-paper {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='p'><feTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='2'/><feColorMatrix values='0 0 0 0 0.55  0 0 0 0 0.42  0 0 0 0 0.25  0 0 0 0.05 0'/></filter><rect width='100%' height='100%' filter='url(%23p)'/></svg>");
+}
+
+.style-filigree {
+  --font-display: "Cinzel Decorative", "Cabinet Grotesk", serif;
+  --font-body: "Cormorant Garamond", Georgia, serif;
+  --radius: 0.9rem;
+}
+.style-filigree h1, .style-filigree h2 { letter-spacing: 0.04em; font-weight: 700; }
+
+.style-cyberpunk {
+  --font-display: "Orbitron", ui-sans-serif;
+  --font-body: "JetBrains Mono", ui-monospace, monospace;
+  --radius: 0;
+}
+.style-cyberpunk h1, .style-cyberpunk h2 { letter-spacing: 0.08em; text-transform: uppercase; font-weight: 800; }
+.style-cyberpunk body::after {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 40;
+  background: repeating-linear-gradient(180deg, transparent 0, transparent 2px, rgba(255,255,255,0.03) 2px, rgba(255,255,255,0.03) 3px);
+}
+
+.style-doodle {
+  --font-display: "Caveat Brush", "Caveat", cursive;
+  --font-body: "Caveat", cursive;
+  --radius: 1.4rem;
+  font-size: 1.05rem;
+}
+.style-doodle h1, .style-doodle h2 { font-weight: 400; letter-spacing: 0; }
+
+.style-sumi-ink {
+  --font-display: "Shippori Mincho", "Noto Serif JP", serif;
+  --font-body: "Shippori Mincho", "Noto Serif JP", serif;
+  --radius: 0;
+}
+.style-sumi-ink h1, .style-sumi-ink h2 { font-weight: 800; letter-spacing: 0.02em; }
+
+.style-pixel-8bit {
+  --font-display: "Press Start 2P", monospace;
+  --font-body: "VT323", monospace;
+  --radius: 0;
+  font-size: 1.05rem;
+}
+.style-pixel-8bit h1, .style-pixel-8bit h2 { letter-spacing: 0; font-weight: 400; line-height: 1.4; }
+.style-pixel-8bit h1 { font-size: 2.5rem !important; }
+.style-pixel-8bit h2 { font-size: 1.25rem !important; }
+
+.style-brutalist {
+  --font-display: "Anton", "Cabinet Grotesk", sans-serif;
+  --font-body: "Space Mono", ui-monospace, monospace;
+  --radius: 0;
+}
+.style-brutalist h1, .style-brutalist h2 { letter-spacing: 0; text-transform: uppercase; }
+
+.style-art-deco {
+  --font-display: "Italiana", serif;
+  --font-body: "Cormorant", serif;
+  --radius: 0.15rem;
+}
+.style-art-deco h1, .style-art-deco h2 { letter-spacing: 0.1em; font-weight: 400; text-transform: uppercase; }
+
+.style-watercolor {
+  --font-display: "Caveat", cursive;
+  --font-body: "Crimson Pro", Georgia, serif;
+  --radius: 1rem;
+}
+.style-watercolor h1, .style-watercolor h2 { font-weight: 600; letter-spacing: 0; }
+.style-watercolor {
+  background-image: radial-gradient(at 20% 30%, hsl(var(--primary) / 0.06) 0px, transparent 50%),
+                    radial-gradient(at 80% 70%, hsl(var(--accent) / 0.05) 0px, transparent 50%);
 }
 
 /* Decorative noise overlay */

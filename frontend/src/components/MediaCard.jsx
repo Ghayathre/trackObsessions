@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Card } from "./ui/card";
 import { Star, Plus, Minus, Trash2, RefreshCw, Globe, Calendar, Hash } from "lucide-react";
+import { motion } from "framer-motion";
 import api from "../lib/api";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Input } from "./ui/input";
@@ -84,11 +85,16 @@ export default function MediaCard({ item, onChange, kind = "video" }) {
 
   return (
     <>
-      <Card
-        onClick={() => { setDraft(item); setOpen(true); }}
-        className="group relative overflow-hidden cursor-pointer border-border bg-card aspect-[2/3] hover:scale-[1.03] transition-transform duration-300 fade-up"
-        data-testid={`media-card-${item.id}`}
+      <motion.div
+        whileHover={{ y: -6, scale: 1.035 }}
+        whileTap={{ scale: 0.985 }}
+        transition={{ type: "spring", stiffness: 280, damping: 22 }}
       >
+        <Card
+          onClick={() => { setDraft(item); setOpen(true); }}
+          className="group relative overflow-hidden cursor-pointer border-border bg-card aspect-[2/3] fade-up"
+          data-testid={`media-card-${item.id}`}
+        >
         {item.cover_url && !coverFailed ? (
           <img
             src={item.cover_url}
@@ -125,6 +131,7 @@ export default function MediaCard({ item, onChange, kind = "video" }) {
           </div>
         </div>
       </Card>
+      </motion.div>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid={`detail-dialog-${item.id}`}>

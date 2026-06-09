@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../lib/api";
 import ThemePicker from "../components/ThemePicker";
+import StylePicker from "../components/StylePicker";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -150,8 +151,17 @@ export default function Settings() {
       {/* Themes */}
       <section>
         <h2 className="font-display font-bold text-2xl mb-3">Themes</h2>
-        <p className="text-sm text-muted-foreground mb-5 max-w-2xl">Pick a vibe. Your choice syncs across devices.</p>
+        <p className="text-sm text-muted-foreground mb-5 max-w-2xl">Pick a vibe. Themes control colour.</p>
         <ThemePicker />
+      </section>
+
+      {/* Styles */}
+      <section>
+        <h2 className="font-display font-bold text-2xl mb-3">Styles</h2>
+        <p className="text-sm text-muted-foreground mb-5 max-w-2xl">
+          Styles control <i>form</i> — fonts, corner radius, textures. Mix any Style with any Theme.
+        </p>
+        <StylePicker />
       </section>
 
       {/* Imports */}

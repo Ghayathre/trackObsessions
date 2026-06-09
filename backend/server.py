@@ -168,6 +168,7 @@ class SettingsIn(BaseModel):
     profile_public: Optional[bool] = None
     name: Optional[str] = None
     username: Optional[str] = None
+    style: Optional[str] = None
 
 class SuggestionIn(BaseModel):
     title: str
@@ -359,6 +360,8 @@ async def update_settings(payload: SettingsIn, user=Depends(get_current_user)):
         if existing:
             raise HTTPException(status_code=400, detail="Username already taken")
         update["username"] = new_u
+    if payload.style is not None:
+        update["style"] = payload.style.strip()[:40] or "default"
     if not update:
         raise HTTPException(status_code=400, detail="No fields to update")
     await db.users.update_one({"_id": user["_id"]}, {"$set": update})
@@ -1047,6 +1050,7 @@ async def public_profile(username: str):
             "username": u.get("username"),
             "name": u.get("name"),
             "theme": u.get("theme") or "tokyo-twilight",
+            "style": u.get("style") or "default",
             "created_at": u.get("created_at"),
         },
         "categories": cats_out,
