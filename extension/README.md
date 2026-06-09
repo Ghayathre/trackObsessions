@@ -35,6 +35,14 @@ classified, it's added to your collection automatically.
 The popup also has an **Auto-track** toggle: ON pushes titles instantly as you
 browse; OFF shows a `+` badge and lets you confirm each one from the popup.
 
+## Add a title manually
+
+If auto-detection misses (unsupported site, odd page), open the popup →
+**＋ Add a title manually**: pick a media type, search — the title autofills
+from the matching catalogue (Jikan for anime/manga, TVmaze for shows,
+OpenLibrary for books) — optionally set an episode/chapter, and **Add to
+Hanabi**. If nothing matches you can still submit the title you typed.
+
 ## Supported sites
 
 | Site | Category |

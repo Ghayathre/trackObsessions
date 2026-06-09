@@ -26,6 +26,9 @@
   "permissions": ["storage", "notifications", "activeTab"],
   "host_permissions": [
     "https://yupganesyypaqhirgmbi.supabase.co/*",
+    "https://api.jikan.moe/*",
+    "https://api.tvmaze.com/*",
+    "https://openlibrary.org/*",
     "*://*.crunchyroll.com/*",
     "*://hianime.to/*",
     "*://aniwatch.to/*",

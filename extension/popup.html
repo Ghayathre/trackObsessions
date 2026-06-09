@@ -48,6 +48,19 @@
         Nothing detected on this page yet. Open a supported title page.
       </div>
 
+      <details id="manual">
+        <summary>+ Add a title manually</summary>
+        <div class="manual-body">
+          <select id="manual-type" aria-label="Media type"></select>
+          <div class="search-wrap">
+            <input id="manual-query" type="text" placeholder="Search a title…" autocomplete="off" />
+            <div id="manual-results" class="results" hidden></div>
+          </div>
+          <input id="manual-episode" type="number" min="0" placeholder="Episode / chapter (optional)" />
+          <button id="manual-add" class="primary">Add to Hanabi</button>
+        </div>
+      </details>
+
       <p id="conn-msg" class="msg" hidden></p>
 
       <footer>
