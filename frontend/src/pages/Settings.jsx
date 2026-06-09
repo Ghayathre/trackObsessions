@@ -6,10 +6,11 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Switch } from "../components/ui/switch";
-import { Copy, Trash2, KeyRound, ShieldAlert, User, Share2, ExternalLink, Sparkles } from "lucide-react";
+import { Copy, Trash2, KeyRound, ShieldAlert, User, Share2, ExternalLink, Sparkles, Download } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
+import ImportAniListDialog from "../components/ImportAniListDialog";
 
 export default function Settings() {
   const { user, refresh } = useAuth();
@@ -151,6 +152,21 @@ export default function Settings() {
         <h2 className="font-display font-bold text-2xl mb-3">Themes</h2>
         <p className="text-sm text-muted-foreground mb-5 max-w-2xl">Pick a vibe. Your choice syncs across devices.</p>
         <ThemePicker />
+      </section>
+
+      {/* Imports */}
+      <section>
+        <h2 className="font-display font-bold text-2xl mb-3 flex items-center gap-2"><Download className="w-5 h-5" /> Imports</h2>
+        <p className="text-sm text-muted-foreground mb-5 max-w-2xl">
+          Already tracking somewhere else? Bring your list over.
+        </p>
+        <Card className="p-5 flex items-center justify-between gap-4 flex-wrap">
+          <div className="min-w-0">
+            <div className="font-medium">AniList</div>
+            <p className="text-sm text-muted-foreground mt-1">Import a public AniList user's anime or manga list. Dedupes on AniList ID, so you can re-run safely.</p>
+          </div>
+          <ImportAniListDialog />
+        </Card>
       </section>
 
       {/* API keys */}

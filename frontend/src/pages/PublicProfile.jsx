@@ -17,7 +17,7 @@ const STATUS_COLOR = {
 };
 
 export default function PublicProfile() {
-  const { username } = useParams();
+  const { username, slug } = useParams();
   const [profile, setProfile] = useState(null);
   const [activeCat, setActiveCat] = useState(null);
   const [titles, setTitles] = useState([]);
@@ -45,13 +45,19 @@ export default function PublicProfile() {
           [...root.classList].filter((c) => c.startsWith("theme-")).forEach((c) => root.classList.remove(c));
           root.classList.add(`theme-${data.user.theme}`);
         }
-        if (data.categories.length) setActiveCat(data.categories[0].id);
+        // Prefer URL slug, else first category
+        if (slug) {
+          const m = data.categories.find((c) => c.slug === slug);
+          setActiveCat(m ? m.id : (data.categories[0]?.id || null));
+        } else if (data.categories.length) {
+          setActiveCat(data.categories[0].id);
+        }
       } catch (e) {
         setError(e.response?.status === 404 ? "This profile is private or doesn't exist." : "Could not load profile.");
       }
     })();
     return () => { mounted = false; };
-  }, [username]);
+  }, [username, slug]);
 
   useEffect(() => {
     if (!activeCat || !profile) return;

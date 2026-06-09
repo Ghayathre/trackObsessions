@@ -279,6 +279,65 @@ async def set_theme(payload: ThemeIn, user=Depends(get_current_user)):
     await db.users.update_one({"_id": user["_id"]}, {"$set": {"theme": payload.theme}})
     return {"ok": True, "theme": payload.theme}
 
+@api.post("/auth/google/session")
+async def google_session(payload: dict, response: Response):
+    """Exchange an Emergent Google OAuth session_id for our own access_token cookie.
+    REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
+    """
+    session_id = (payload or {}).get("session_id")
+    if not session_id:
+        raise HTTPException(status_code=400, detail="Missing session_id")
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as cli:
+            r = await cli.get(
+                "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
+                headers={"X-Session-ID": session_id},
+            )
+    except Exception:
+        raise HTTPException(status_code=502, detail="Could not reach auth provider")
+    if r.status_code != 200:
+        raise HTTPException(status_code=401, detail="Invalid or expired Google session")
+    data = r.json() or {}
+    email = (data.get("email") or "").lower().strip()
+    name = (data.get("name") or "").strip()
+    picture = data.get("picture") or ""
+    if not email:
+        raise HTTPException(status_code=400, detail="Google account had no email")
+
+    user = await db.users.find_one({"email": email})
+    if not user:
+        username = await unique_username(name or email.split("@")[0])
+        doc = {
+            "email": email,
+            "username": username,
+            "name": name or email.split("@")[0],
+            "picture": picture,
+            "google_linked": True,
+            "theme": "tokyo-twilight",
+            "auto_accept": False,
+            "profile_public": False,
+            "created_at": now_iso(),
+        }
+        res = await db.users.insert_one(doc)
+        cats = [
+            {**c, "user_id": res.inserted_id, "is_default": True, "created_at": now_iso()}
+            for c in DEFAULT_CATEGORIES
+        ]
+        await db.categories.insert_many(cats)
+        user = await db.users.find_one({"_id": res.inserted_id})
+    else:
+        await db.users.update_one(
+            {"_id": user["_id"]},
+            {"$set": {"google_linked": True, "picture": picture or user.get("picture", "")}},
+        )
+
+    token = create_access_token(str(user["_id"]), email)
+    response.set_cookie(
+        "access_token", token, httponly=True, secure=False, samesite="lax",
+        max_age=ACCESS_TTL_MIN * 60, path="/",
+    )
+    return {"user": serialize(user), "token": token}
+
 @api.patch("/auth/settings")
 async def update_settings(payload: SettingsIn, user=Depends(get_current_user)):
     update: dict = {}
@@ -797,11 +856,17 @@ async def public_profile(username: str):
     }
 
 @api.get("/public/u/{username}/titles")
-async def public_titles(username: str, category_id: Optional[str] = None, status: Optional[str] = None):
+async def public_titles(username: str, category_id: Optional[str] = None,
+                        category_slug: Optional[str] = None, status: Optional[str] = None):
     u = await _public_user_or_404(username)
     q: dict = {"user_id": u["_id"]}
     if category_id:
         q["category_id"] = oid(category_id)
+    elif category_slug:
+        cat = await db.categories.find_one({"user_id": u["_id"], "slug": category_slug})
+        if not cat:
+            raise HTTPException(status_code=404, detail="Collection not found")
+        q["category_id"] = cat["_id"]
     if status:
         q["status"] = status
     items = await db.titles.find(q).sort("updated_at", -1).limit(500).to_list(500)
@@ -809,10 +874,109 @@ async def public_titles(username: str, category_id: Optional[str] = None, status
     for t in items:
         d = serialize(t)
         d["category_id"] = str(t["category_id"])
-        # strip private fields
         d.pop("notes", None)
         out.append(d)
     return out
+
+
+# ---------- Imports (AniList) ----------
+ANILIST_STATUS_MAP = {
+    "CURRENT": "watching", "REPEATING": "watching",
+    "PLANNING": "plan",
+    "COMPLETED": "completed",
+    "DROPPED": "dropped",
+    "PAUSED": "on_hold",
+}
+
+@api.post("/import/anilist")
+async def import_anilist(payload: dict, user=Depends(get_current_user)):
+    """Import a public AniList user's anime or manga list into a target category."""
+    al_username = ((payload or {}).get("username") or "").strip()
+    media_type = ((payload or {}).get("type") or "ANIME").upper()
+    target_cat_id = (payload or {}).get("category_id")
+    if not al_username or media_type not in ("ANIME", "MANGA") or not target_cat_id:
+        raise HTTPException(status_code=400, detail="username, type (ANIME|MANGA) and category_id are required")
+    cat = await db.categories.find_one({"_id": oid(target_cat_id), "user_id": user["_id"]})
+    if not cat:
+        raise HTTPException(status_code=404, detail="Target category not found")
+
+    query = """
+    query ($userName: String, $type: MediaType) {
+      MediaListCollection(userName: $userName, type: $type) {
+        lists {
+          name
+          entries {
+            status progress score
+            media { id title { romaji english } episodes chapters coverImage { large } }
+          }
+        }
+      }
+    }
+    """
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as cli:
+            r = await cli.post(
+                "https://graphql.anilist.co",
+                json={"query": query, "variables": {"userName": al_username, "type": media_type}},
+                headers={"Content-Type": "application/json"},
+            )
+    except Exception:
+        raise HTTPException(status_code=502, detail="Could not reach AniList")
+    if r.status_code == 404:
+        raise HTTPException(status_code=404, detail="AniList user not found")
+    if r.status_code != 200:
+        raise HTTPException(status_code=502, detail=f"AniList error ({r.status_code})")
+    body = r.json() or {}
+    if body.get("errors"):
+        msg = body["errors"][0].get("message", "AniList error")
+        raise HTTPException(status_code=400, detail=msg)
+    collection = (body.get("data") or {}).get("MediaListCollection") or {}
+    lists = collection.get("lists") or []
+
+    imported = 0
+    skipped = 0
+    for lst in lists:
+        for e in (lst.get("entries") or []):
+            m = e.get("media") or {}
+            title = (m.get("title") or {}).get("english") or (m.get("title") or {}).get("romaji")
+            if not title:
+                skipped += 1
+                continue
+            ext_id = f"al-{m.get('id')}"
+            # dedup on external_id within this category
+            existing = await db.titles.find_one({
+                "user_id": user["_id"],
+                "category_id": cat["_id"],
+                "external_id": ext_id,
+            })
+            if existing:
+                skipped += 1
+                continue
+            doc = {
+                "user_id": user["_id"],
+                "category_id": cat["_id"],
+                "title": title,
+                "status": ANILIST_STATUS_MAP.get(e.get("status"), "plan"),
+                "progress": int(e.get("progress") or 0),
+                "total": m.get("episodes") if media_type == "ANIME" else m.get("chapters"),
+                "season": None,
+                "rating": (float(e.get("score")) / 10.0) if e.get("score") else None,
+                "notes": "",
+                "cover_url": ((m.get("coverImage") or {}).get("large")) or "",
+                "source": "anilist",
+                "external_id": ext_id,
+                "created_at": now_iso(),
+                "updated_at": now_iso(),
+            }
+            await db.titles.insert_one(doc)
+            imported += 1
+    if imported:
+        await log_activity(user["_id"], "add",
+                           title=f"AniList import ({imported})",
+                           category_id=str(cat["_id"]),
+                           category_name=cat.get("name", ""),
+                           extra={"source": "anilist", "count": imported})
+    return {"imported": imported, "skipped": skipped, "category_id": str(cat["_id"])}
 
 
 # ---------- Startup ----------

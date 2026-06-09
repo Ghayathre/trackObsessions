@@ -4,7 +4,10 @@ import api from "../lib/api";
 import MediaCard from "../components/MediaCard";
 import AddTitleDialog from "../components/AddTitleDialog";
 import { Input } from "../components/ui/input";
-import { Search } from "lucide-react";
+import { Button } from "../components/ui/button";
+import { Search, Share2 } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
+import { toast } from "sonner";
 
 const FILTERS = [
   { value: "all", label: "All" },
@@ -17,6 +20,7 @@ const FILTERS = [
 
 export default function Category() {
   const { id } = useParams();
+  const { user } = useAuth();
   const [cat, setCat] = useState(null);
   const [items, setItems] = useState([]);
   const [filter, setFilter] = useState("all");
@@ -57,7 +61,24 @@ export default function Category() {
           <h1 className="text-4xl sm:text-5xl font-display font-black tracking-tight">{cat?.name || "…"}</h1>
           <p className="text-muted-foreground mt-1">{items.length} title{items.length !== 1 ? "s" : ""}</p>
         </div>
-        {cat && <AddTitleDialog categoryId={cat.id} categoryKind={kind} onAdded={() => load()} />}
+        <div className="flex items-center gap-2">
+          {user?.profile_public && cat && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const url = `${window.location.origin}/u/${user.username}/c/${cat.slug}`;
+                navigator.clipboard.writeText(url);
+                toast.success("Collection link copied");
+              }}
+              data-testid="share-collection-btn"
+              title="Copy public link to this collection"
+            >
+              <Share2 className="w-3.5 h-3.5 mr-1" /> Share
+            </Button>
+          )}
+          {cat && <AddTitleDialog categoryId={cat.id} categoryKind={kind} onAdded={() => load()} />}
+        </div>
       </header>
 
       <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">

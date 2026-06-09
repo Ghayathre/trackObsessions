@@ -425,3 +425,173 @@ def test_activity_logged_for_suggestion_accept_and_auto_accept():
     auto = [x for x in items2 if x.get("title") == auto_title and x["type"] == "extension_add"]
     assert auto, "auto-accept should log extension_add"
     assert auto[0]["extra"].get("auto") is True
+
+
+
+# ---------- NEW FEATURES (iteration 4): Google OAuth session, AniList import, per-collection share ----------
+
+# --- Google OAuth: unhappy paths only (no real OAuth flow) ---
+def test_google_session_missing_session_id_returns_400():
+    r = requests.post(f"{API}/auth/google/session", json={})
+    assert r.status_code == 400, r.text
+    assert "session_id" in r.json().get("detail", "").lower()
+
+
+def test_google_session_invalid_session_id_returns_401():
+    r = requests.post(f"{API}/auth/google/session", json={"session_id": "bogus-invalid-session-xyz"})
+    # Emergent's session-data endpoint should reject the bogus id with non-200, which we map to 401.
+    # 502 is acceptable only if Emergent infra is unreachable.
+    assert r.status_code in (401, 502), r.text
+    if r.status_code == 401:
+        assert "google" in r.json().get("detail", "").lower() or "invalid" in r.json().get("detail", "").lower()
+
+
+# --- Public per-collection (category_slug) on the existing public profile route ---
+def test_public_titles_filter_by_category_slug(admin_headers):
+    # Ensure admin profile is public
+    requests.patch(f"{API}/auth/settings", headers=admin_headers, json={"profile_public": True})
+    me = requests.get(f"{API}/auth/me", headers=admin_headers).json()
+    username = me["username"]
+
+    cats = requests.get(f"{API}/categories", headers=admin_headers).json()
+    kd = next(c for c in cats if c["slug"] == "kdramas")
+    anime = next(c for c in cats if c["slug"] == "anime")
+
+    # Seed one title in each category
+    t_kd = requests.post(f"{API}/titles", headers=admin_headers, json={
+        "title": f"TEST_PCS_KD_{uuid.uuid4().hex[:5]}", "category_id": kd["id"], "status": "watching",
+    }).json()
+    t_an = requests.post(f"{API}/titles", headers=admin_headers, json={
+        "title": f"TEST_PCS_AN_{uuid.uuid4().hex[:5]}", "category_id": anime["id"], "status": "watching",
+    }).json()
+
+    try:
+        r = requests.get(f"{API}/public/u/{username}/titles", params={"category_slug": "kdramas"})
+        assert r.status_code == 200, r.text
+        items = r.json()
+        # every returned title must belong to the kdramas category
+        assert all(t["category_id"] == kd["id"] for t in items), "category_slug filter did not scope correctly"
+        assert any(t["id"] == t_kd["id"] for t in items)
+        assert not any(t["id"] == t_an["id"] for t in items), "anime title leaked into kdramas filter"
+
+        # nonexistent slug → 404
+        r404 = requests.get(f"{API}/public/u/{username}/titles", params={"category_slug": "nonexistent-cat"})
+        assert r404.status_code == 404
+
+        # category_id still works (regression)
+        rid = requests.get(f"{API}/public/u/{username}/titles", params={"category_id": kd["id"]})
+        assert rid.status_code == 200
+        assert all(t["category_id"] == kd["id"] for t in rid.json())
+    finally:
+        requests.delete(f"{API}/titles/{t_kd['id']}", headers=admin_headers)
+        requests.delete(f"{API}/titles/{t_an['id']}", headers=admin_headers)
+
+
+def test_public_titles_with_category_slug_unrelated_public_user():
+    # Create a second user, make profile public, add titles, query by slug.
+    email = f"test_{uuid.uuid4().hex[:8]}@example.com"
+    rr = requests.post(f"{API}/auth/register", json={"email": email, "password": "secret123", "name": "Pub Tester"})
+    assert rr.status_code == 200, rr.text
+    tok = rr.json()["token"]
+    username = rr.json()["user"]["username"]
+    H = {"Authorization": f"Bearer {tok}"}
+    requests.patch(f"{API}/auth/settings", headers=H, json={"profile_public": True})
+
+    cats = requests.get(f"{API}/categories", headers=H).json()
+    manga = next(c for c in cats if c["slug"] == "manga")
+    t = requests.post(f"{API}/titles", headers=H, json={
+        "title": f"TEST_OtherUser_{uuid.uuid4().hex[:5]}", "category_id": manga["id"], "status": "watching",
+    }).json()
+
+    r = requests.get(f"{API}/public/u/{username}/titles", params={"category_slug": "manga"})
+    assert r.status_code == 200, r.text
+    items = r.json()
+    assert any(x["id"] == t["id"] for x in items)
+    assert all(x["category_id"] == manga["id"] for x in items)
+
+
+# --- AniList import: validation + 404 + dedup ---
+def test_anilist_import_validates_required_fields(admin_headers):
+    cats = requests.get(f"{API}/categories", headers=admin_headers).json()
+    manga_cat = next(c for c in cats if c["slug"] == "manga")
+
+    # missing username
+    r = requests.post(f"{API}/import/anilist", headers=admin_headers,
+                      json={"type": "MANGA", "category_id": manga_cat["id"]})
+    assert r.status_code == 400, r.text
+
+    # bad type
+    r = requests.post(f"{API}/import/anilist", headers=admin_headers,
+                      json={"username": "Hanabi", "type": "BOOKS", "category_id": manga_cat["id"]})
+    assert r.status_code == 400
+
+    # missing category
+    r = requests.post(f"{API}/import/anilist", headers=admin_headers,
+                      json={"username": "Hanabi", "type": "MANGA"})
+    assert r.status_code == 400
+
+    # category not owned by user → 404
+    r = requests.post(f"{API}/import/anilist", headers=admin_headers,
+                      json={"username": "Hanabi", "type": "MANGA",
+                            "category_id": "ffffffffffffffffffffffff"})
+    assert r.status_code in (400, 404)
+
+
+def test_anilist_import_nonexistent_user_returns_404(admin_headers):
+    cats = requests.get(f"{API}/categories", headers=admin_headers).json()
+    manga_cat = next(c for c in cats if c["slug"] == "manga")
+    bogus = f"hanabi_no_such_user_{uuid.uuid4().hex[:10]}"
+    r = requests.post(f"{API}/import/anilist", headers=admin_headers,
+                      json={"username": bogus, "type": "MANGA", "category_id": manga_cat["id"]})
+    # 404 expected; 502 acceptable if AniList is unreachable
+    assert r.status_code in (404, 502), r.text
+
+
+def test_anilist_import_manga_and_dedup(admin_headers):
+    """Import twice and assert second run imports 0 (dedup by external_id)."""
+    # Use a fresh user + fresh category to keep this isolated and deterministic.
+    email = f"test_{uuid.uuid4().hex[:8]}@example.com"
+    rr = requests.post(f"{API}/auth/register",
+                      json={"email": email, "password": "secret123", "name": "AniList Tester"})
+    assert rr.status_code == 200
+    H = {"Authorization": f"Bearer {rr.json()['token']}"}
+
+    cats = requests.get(f"{API}/categories", headers=H).json()
+    manga_cat = next(c for c in cats if c["slug"] == "manga")
+
+    # Try a well-known public AniList user; if AniList unreachable / empty, soft-pass.
+    target_username = "Josh"  # fallback known public list; small/stable
+    r1 = requests.post(f"{API}/import/anilist", headers=H,
+                       json={"username": target_username, "type": "MANGA", "category_id": manga_cat["id"]})
+
+    if r1.status_code == 502:
+        pytest.skip("AniList unreachable in this environment (502)")
+    if r1.status_code == 404:
+        # try another well-known username
+        target_username = "Hanabi"
+        r1 = requests.post(f"{API}/import/anilist", headers=H,
+                           json={"username": target_username, "type": "MANGA", "category_id": manga_cat["id"]})
+        if r1.status_code in (404, 502):
+            pytest.skip(f"AniList username unreachable for both fallbacks (status {r1.status_code})")
+
+    assert r1.status_code == 200, r1.text
+    body1 = r1.json()
+    assert "imported" in body1 and "skipped" in body1 and body1["category_id"] == manga_cat["id"]
+
+    # Verify any imported titles are in the manga category and have source='anilist'
+    titles = requests.get(f"{API}/titles?category_id={manga_cat['id']}", headers=H).json()
+    if body1["imported"] > 0:
+        assert all(t["category_id"] == manga_cat["id"] for t in titles)
+        # at least one should be source=anilist
+        assert any(t.get("source") == "anilist" for t in titles), "expected source='anilist' on imported titles"
+
+    # Second run: dedup → 0 imported
+    r2 = requests.post(f"{API}/import/anilist", headers=H,
+                       json={"username": target_username, "type": "MANGA", "category_id": manga_cat["id"]})
+    assert r2.status_code == 200, r2.text
+    body2 = r2.json()
+    if body1["imported"] > 0:
+        assert body2["imported"] == 0, f"dedup failed: 2nd run imported {body2['imported']} (1st: {body1['imported']})"
+    else:
+        # If user had 0 entries, both runs should be 0
+        assert body2["imported"] == 0
