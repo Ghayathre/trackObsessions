@@ -1,89 +1,633 @@
-from fastapi import FastAPI, APIRouter
 from dotenv import load_dotenv
-from starlette.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
-import os
-import logging
 from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict
-from typing import List
-import uuid
-from datetime import datetime, timezone
-
 
 ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
+load_dotenv(ROOT_DIR / ".env")
 
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
+import os
+import logging
+import secrets
+from typing import List, Optional, Annotated
+from datetime import datetime, timezone, timedelta
+
+import bcrypt
+import jwt
+import httpx
+from bson import ObjectId
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, Header, Query
+from fastapi.middleware.cors import CORSMiddleware
+from motor.motor_asyncio import AsyncIOMotorClient
+from pydantic import BaseModel, BeforeValidator, ConfigDict, EmailStr, Field
+
+# ---------- Mongo ----------
+mongo_url = os.environ["MONGO_URL"]
 client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+db = client[os.environ["DB_NAME"]]
 
-# Create the main app without a prefix
-app = FastAPI()
+# ---------- Constants ----------
+JWT_ALGORITHM = "HS256"
+ACCESS_TTL_MIN = 60 * 24 * 7  # 7 days for hobby app convenience
+DEFAULT_CATEGORIES = [
+    {"slug": "kdramas", "name": "K-Dramas", "icon": "Clapperboard", "kind": "video"},
+    {"slug": "thai-bl", "name": "Thai BLs", "icon": "Heart", "kind": "video"},
+    {"slug": "anime", "name": "Anime", "icon": "Sparkles", "kind": "video"},
+    {"slug": "manga", "name": "Manga", "icon": "BookOpen", "kind": "reading"},
+    {"slug": "books", "name": "Books", "icon": "Library", "kind": "reading"},
+]
 
-# Create a router with the /api prefix
-api_router = APIRouter(prefix="/api")
+# ---------- Helpers ----------
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
+def verify_password(plain: str, hashed: str) -> bool:
+    try:
+        return bcrypt.checkpw(plain.encode(), hashed.encode())
+    except Exception:
+        return False
+
+def get_jwt_secret() -> str:
+    return os.environ["JWT_SECRET"]
+
+def create_access_token(user_id: str, email: str) -> str:
+    payload = {
+        "sub": user_id,
+        "email": email,
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TTL_MIN),
+        "type": "access",
+    }
+    return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
+
+def now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+def oid(s: str) -> ObjectId:
+    try:
+        return ObjectId(s)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid id")
+
+def serialize(doc: dict) -> dict:
+    if not doc:
+        return doc
+    d = dict(doc)
+    if "_id" in d:
+        d["id"] = str(d["_id"])
+        del d["_id"]
+    if "user_id" in d and isinstance(d["user_id"], ObjectId):
+        d["user_id"] = str(d["user_id"])
+    d.pop("password_hash", None)
+    d.pop("key_hash", None)
+    return d
 
 
-# Define Models
-class StatusCheck(BaseModel):
-    model_config = ConfigDict(extra="ignore")  # Ignore MongoDB's _id field
-    
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+# ---------- Models ----------
+class RegisterIn(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=6)
+    name: Optional[str] = None
 
-class StatusCheckCreate(BaseModel):
-    client_name: str
+class LoginIn(BaseModel):
+    email: EmailStr
+    password: str
 
-# Add your routes to the router instead of directly to app
-@api_router.get("/")
-async def root():
-    return {"message": "Hello World"}
+class CategoryIn(BaseModel):
+    name: str
+    icon: Optional[str] = "Sparkles"
+    kind: Optional[str] = "video"  # video | reading | custom
 
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.model_dump()
-    status_obj = StatusCheck(**status_dict)
-    
-    # Convert to dict and serialize datetime to ISO string for MongoDB
-    doc = status_obj.model_dump()
-    doc['timestamp'] = doc['timestamp'].isoformat()
-    
-    _ = await db.status_checks.insert_one(doc)
-    return status_obj
+class TitleIn(BaseModel):
+    title: str
+    category_id: str
+    status: Optional[str] = "watching"  # watching | completed | plan | dropped | on_hold
+    progress: Optional[int] = 0  # episode or chapter
+    total: Optional[int] = None
+    season: Optional[int] = None
+    rating: Optional[float] = None
+    notes: Optional[str] = ""
+    cover_url: Optional[str] = ""
+    source: Optional[str] = "manual"  # manual | extension
+    external_id: Optional[str] = None
 
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    # Exclude MongoDB's _id field from the query results
-    status_checks = await db.status_checks.find({}, {"_id": 0}).to_list(1000)
-    
-    # Convert ISO string timestamps back to datetime objects
-    for check in status_checks:
-        if isinstance(check['timestamp'], str):
-            check['timestamp'] = datetime.fromisoformat(check['timestamp'])
-    
-    return status_checks
+class TitleUpdate(BaseModel):
+    title: Optional[str] = None
+    status: Optional[str] = None
+    progress: Optional[int] = None
+    total: Optional[int] = None
+    season: Optional[int] = None
+    rating: Optional[float] = None
+    notes: Optional[str] = None
+    cover_url: Optional[str] = None
 
-# Include the router in the main app
-app.include_router(api_router)
+class ThemeIn(BaseModel):
+    theme: str
+
+class SuggestionIn(BaseModel):
+    title: str
+    category_slug: Optional[str] = None
+    category_hint: Optional[str] = None  # extension's guess: "anime", "kdrama"
+    season: Optional[int] = None
+    episode: Optional[int] = None
+    cover_url: Optional[str] = None
+    source_url: Optional[str] = None
+
+class SuggestionAction(BaseModel):
+    action: str  # accept | reject
+    category_id: Optional[str] = None  # optional override on accept
+
+
+# ---------- Auth deps ----------
+async def get_current_user(request: Request) -> dict:
+    token = request.cookies.get("access_token")
+    if not token:
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith("Bearer "):
+            token = auth[7:]
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    try:
+        payload = jwt.decode(token, get_jwt_secret(), algorithms=[JWT_ALGORITHM])
+        if payload.get("type") != "access":
+            raise HTTPException(status_code=401, detail="Invalid token type")
+        user = await db.users.find_one({"_id": ObjectId(payload["sub"])})
+        if not user:
+            raise HTTPException(status_code=401, detail="User not found")
+        return user
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+async def get_user_by_api_key(x_api_key: Annotated[Optional[str], Header()] = None) -> dict:
+    if not x_api_key:
+        raise HTTPException(status_code=401, detail="Missing X-API-Key header")
+    # Look up by SHA256 hash? Simpler: store the key directly with a prefix that's a lookup field
+    # Use the key prefix (first 8 chars) for index, then verify the full key by hash
+    import hashlib
+    digest = hashlib.sha256(x_api_key.encode()).hexdigest()
+    rec = await db.api_keys.find_one({"key_hash": digest, "revoked": {"$ne": True}})
+    if not rec:
+        raise HTTPException(status_code=401, detail="Invalid API key")
+    user = await db.users.find_one({"_id": rec["user_id"]})
+    if not user:
+        raise HTTPException(status_code=401, detail="User for key not found")
+    # update last_used
+    await db.api_keys.update_one({"_id": rec["_id"]}, {"$set": {"last_used_at": now_iso()}})
+    return user
+
+
+# ---------- App / Router ----------
+app = FastAPI(title="Hanabi Hobby Tracker")
+api = APIRouter(prefix="/api")
+
+
+# ---------- Auth Routes ----------
+@api.post("/auth/register")
+async def register(payload: RegisterIn, response: Response):
+    email = payload.email.lower().strip()
+    if await db.users.find_one({"email": email}):
+        raise HTTPException(status_code=400, detail="Email already registered")
+    doc = {
+        "email": email,
+        "name": payload.name or email.split("@")[0],
+        "password_hash": hash_password(payload.password),
+        "theme": "tokyo-twilight",
+        "created_at": now_iso(),
+    }
+    res = await db.users.insert_one(doc)
+    user_id = str(res.inserted_id)
+    # seed default categories for this user
+    cats = [
+        {**c, "user_id": ObjectId(user_id), "is_default": True, "created_at": now_iso()}
+        for c in DEFAULT_CATEGORIES
+    ]
+    await db.categories.insert_many(cats)
+    token = create_access_token(user_id, email)
+    response.set_cookie("access_token", token, httponly=True, secure=False, samesite="lax",
+                        max_age=ACCESS_TTL_MIN * 60, path="/")
+    return {"user": serialize({**doc, "_id": res.inserted_id}), "token": token}
+
+@api.post("/auth/login")
+async def login(payload: LoginIn, response: Response):
+    email = payload.email.lower().strip()
+    user = await db.users.find_one({"email": email})
+    if not user or not verify_password(payload.password, user["password_hash"]):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    token = create_access_token(str(user["_id"]), email)
+    response.set_cookie("access_token", token, httponly=True, secure=False, samesite="lax",
+                        max_age=ACCESS_TTL_MIN * 60, path="/")
+    return {"user": serialize(user), "token": token}
+
+@api.post("/auth/logout")
+async def logout(response: Response, _user=Depends(get_current_user)):
+    response.delete_cookie("access_token", path="/")
+    return {"ok": True}
+
+@api.get("/auth/me")
+async def me(user=Depends(get_current_user)):
+    return serialize(user)
+
+@api.patch("/auth/theme")
+async def set_theme(payload: ThemeIn, user=Depends(get_current_user)):
+    await db.users.update_one({"_id": user["_id"]}, {"$set": {"theme": payload.theme}})
+    return {"ok": True, "theme": payload.theme}
+
+
+# ---------- Categories ----------
+@api.get("/categories")
+async def list_categories(user=Depends(get_current_user)):
+    cats = await db.categories.find({"user_id": user["_id"]}).sort("created_at", 1).to_list(500)
+    # add counts
+    out = []
+    for c in cats:
+        count = await db.titles.count_documents({"user_id": user["_id"], "category_id": c["_id"]})
+        out.append({**serialize(c), "count": count})
+    return out
+
+@api.post("/categories")
+async def create_category(payload: CategoryIn, user=Depends(get_current_user)):
+    slug = payload.name.lower().replace(" ", "-")
+    doc = {
+        "user_id": user["_id"],
+        "slug": slug,
+        "name": payload.name,
+        "icon": payload.icon or "Sparkles",
+        "kind": payload.kind or "custom",
+        "is_default": False,
+        "created_at": now_iso(),
+    }
+    res = await db.categories.insert_one(doc)
+    return serialize({**doc, "_id": res.inserted_id, "count": 0})
+
+@api.delete("/categories/{cat_id}")
+async def delete_category(cat_id: str, user=Depends(get_current_user)):
+    _id = oid(cat_id)
+    cat = await db.categories.find_one({"_id": _id, "user_id": user["_id"]})
+    if not cat:
+        raise HTTPException(status_code=404, detail="Category not found")
+    await db.titles.delete_many({"user_id": user["_id"], "category_id": _id})
+    await db.categories.delete_one({"_id": _id})
+    return {"ok": True}
+
+
+# ---------- Titles ----------
+@api.get("/titles")
+async def list_titles(
+    user=Depends(get_current_user),
+    category_id: Optional[str] = None,
+    status: Optional[str] = None,
+    q: Optional[str] = None,
+):
+    query: dict = {"user_id": user["_id"]}
+    if category_id:
+        query["category_id"] = oid(category_id)
+    if status:
+        query["status"] = status
+    if q:
+        query["title"] = {"$regex": q, "$options": "i"}
+    items = await db.titles.find(query).sort("updated_at", -1).to_list(1000)
+    out = []
+    for t in items:
+        d = serialize(t)
+        if "category_id" in t:
+            d["category_id"] = str(t["category_id"])
+        out.append(d)
+    return out
+
+@api.post("/titles")
+async def create_title(payload: TitleIn, user=Depends(get_current_user)):
+    cat_id = oid(payload.category_id)
+    cat = await db.categories.find_one({"_id": cat_id, "user_id": user["_id"]})
+    if not cat:
+        raise HTTPException(status_code=404, detail="Category not found")
+    doc = {
+        "user_id": user["_id"],
+        "category_id": cat_id,
+        "title": payload.title,
+        "status": payload.status or "watching",
+        "progress": payload.progress or 0,
+        "total": payload.total,
+        "season": payload.season,
+        "rating": payload.rating,
+        "notes": payload.notes or "",
+        "cover_url": payload.cover_url or "",
+        "source": payload.source or "manual",
+        "external_id": payload.external_id,
+        "created_at": now_iso(),
+        "updated_at": now_iso(),
+    }
+    res = await db.titles.insert_one(doc)
+    d = serialize({**doc, "_id": res.inserted_id})
+    d["category_id"] = str(cat_id)
+    return d
+
+@api.patch("/titles/{title_id}")
+async def update_title(title_id: str, payload: TitleUpdate, user=Depends(get_current_user)):
+    _id = oid(title_id)
+    update = {k: v for k, v in payload.model_dump(exclude_none=True).items()}
+    if not update:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    update["updated_at"] = now_iso()
+    res = await db.titles.update_one({"_id": _id, "user_id": user["_id"]}, {"$set": update})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Title not found")
+    t = await db.titles.find_one({"_id": _id})
+    d = serialize(t)
+    d["category_id"] = str(t["category_id"])
+    return d
+
+@api.delete("/titles/{title_id}")
+async def delete_title(title_id: str, user=Depends(get_current_user)):
+    res = await db.titles.delete_one({"_id": oid(title_id), "user_id": user["_id"]})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Title not found")
+    return {"ok": True}
+
+
+# ---------- Stats ----------
+@api.get("/stats")
+async def stats(user=Depends(get_current_user)):
+    total = await db.titles.count_documents({"user_id": user["_id"]})
+    watching = await db.titles.count_documents({"user_id": user["_id"], "status": "watching"})
+    completed = await db.titles.count_documents({"user_id": user["_id"], "status": "completed"})
+    plan = await db.titles.count_documents({"user_id": user["_id"], "status": "plan"})
+    pending = await db.suggestions.count_documents({"user_id": user["_id"], "status": "pending"})
+    recent = await db.titles.find({"user_id": user["_id"]}).sort("updated_at", -1).limit(8).to_list(8)
+    recent_out = []
+    for t in recent:
+        d = serialize(t)
+        d["category_id"] = str(t["category_id"])
+        recent_out.append(d)
+    return {
+        "total": total,
+        "watching": watching,
+        "completed": completed,
+        "plan": plan,
+        "pending_suggestions": pending,
+        "recent": recent_out,
+    }
+
+
+# ---------- Metadata search ----------
+@api.get("/metadata/search")
+async def metadata_search(
+    q: str = Query(..., min_length=1),
+    kind: str = Query("anime"),  # anime | manga | books | drama
+    _user=Depends(get_current_user),
+):
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as cli:
+            if kind in ("anime", "manga"):
+                url = f"https://api.jikan.moe/v4/{kind}"
+                r = await cli.get(url, params={"q": q, "limit": 8})
+                data = r.json().get("data", [])
+                return [
+                    {
+                        "title": d.get("title"),
+                        "cover_url": (d.get("images", {}).get("jpg", {}) or {}).get("image_url"),
+                        "external_id": str(d.get("mal_id")),
+                        "total": d.get("episodes") if kind == "anime" else d.get("chapters"),
+                        "synopsis": d.get("synopsis"),
+                    }
+                    for d in data
+                ]
+            elif kind == "books":
+                r = await cli.get("https://openlibrary.org/search.json", params={"q": q, "limit": 8})
+                docs = r.json().get("docs", [])
+                out = []
+                for d in docs:
+                    cover_id = d.get("cover_i")
+                    cover = f"https://covers.openlibrary.org/b/id/{cover_id}-L.jpg" if cover_id else ""
+                    out.append({
+                        "title": d.get("title"),
+                        "cover_url": cover,
+                        "external_id": d.get("key", ""),
+                        "total": d.get("number_of_pages_median"),
+                        "synopsis": (d.get("author_name") or [""])[0],
+                    })
+                return out
+            else:  # drama / kdrama / generic — Jikan won't help; fall through
+                return []
+    except Exception as e:
+        logging.exception("metadata search failed")
+        return []
+
+
+# ---------- API Keys (for Hanabi extension) ----------
+@api.get("/api-keys")
+async def list_keys(user=Depends(get_current_user)):
+    keys = await db.api_keys.find({"user_id": user["_id"]}).sort("created_at", -1).to_list(50)
+    out = []
+    for k in keys:
+        out.append({
+            "id": str(k["_id"]),
+            "label": k.get("label"),
+            "prefix": k.get("prefix"),
+            "created_at": k.get("created_at"),
+            "last_used_at": k.get("last_used_at"),
+            "revoked": k.get("revoked", False),
+        })
+    return out
+
+@api.post("/api-keys")
+async def create_key(payload: dict, user=Depends(get_current_user)):
+    import hashlib
+    raw = "hnb_" + secrets.token_urlsafe(28)
+    digest = hashlib.sha256(raw.encode()).hexdigest()
+    doc = {
+        "user_id": user["_id"],
+        "label": payload.get("label") or "Hanabi extension",
+        "prefix": raw[:10],
+        "key_hash": digest,
+        "created_at": now_iso(),
+        "last_used_at": None,
+        "revoked": False,
+    }
+    res = await db.api_keys.insert_one(doc)
+    return {
+        "id": str(res.inserted_id),
+        "label": doc["label"],
+        "prefix": doc["prefix"],
+        "key": raw,  # shown ONCE
+        "created_at": doc["created_at"],
+    }
+
+@api.delete("/api-keys/{key_id}")
+async def revoke_key(key_id: str, user=Depends(get_current_user)):
+    res = await db.api_keys.update_one(
+        {"_id": oid(key_id), "user_id": user["_id"]}, {"$set": {"revoked": True}}
+    )
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Key not found")
+    return {"ok": True}
+
+
+# ---------- Suggestions (Hanabi inbox) ----------
+@api.get("/suggestions")
+async def list_suggestions(user=Depends(get_current_user), status: Optional[str] = "pending"):
+    q: dict = {"user_id": user["_id"]}
+    if status:
+        q["status"] = status
+    items = await db.suggestions.find(q).sort("created_at", -1).limit(100).to_list(100)
+    return [serialize(s) for s in items]
+
+@api.post("/suggestions/{sug_id}/act")
+async def act_on_suggestion(sug_id: str, payload: SuggestionAction, user=Depends(get_current_user)):
+    _id = oid(sug_id)
+    sug = await db.suggestions.find_one({"_id": _id, "user_id": user["_id"]})
+    if not sug:
+        raise HTTPException(status_code=404, detail="Suggestion not found")
+    if payload.action == "reject":
+        await db.suggestions.update_one({"_id": _id}, {"$set": {"status": "rejected"}})
+        return {"ok": True}
+    if payload.action != "accept":
+        raise HTTPException(status_code=400, detail="Unknown action")
+
+    # determine category
+    cat = None
+    if payload.category_id:
+        cat = await db.categories.find_one({"_id": oid(payload.category_id), "user_id": user["_id"]})
+    if not cat and sug.get("category_slug"):
+        cat = await db.categories.find_one({"user_id": user["_id"], "slug": sug["category_slug"]})
+    if not cat:
+        # fallback to first user category
+        cat = await db.categories.find_one({"user_id": user["_id"]})
+    if not cat:
+        raise HTTPException(status_code=400, detail="No category available")
+
+    # if title already exists in that category, update progress; else create
+    existing = await db.titles.find_one({
+        "user_id": user["_id"],
+        "category_id": cat["_id"],
+        "title": {"$regex": f"^{sug['title']}$", "$options": "i"},
+    })
+    if existing:
+        update = {"updated_at": now_iso(), "source": "extension"}
+        if sug.get("episode") is not None:
+            update["progress"] = max(existing.get("progress") or 0, sug["episode"])
+        if sug.get("season") is not None:
+            update["season"] = sug["season"]
+        await db.titles.update_one({"_id": existing["_id"]}, {"$set": update})
+        title_id = str(existing["_id"])
+    else:
+        doc = {
+            "user_id": user["_id"],
+            "category_id": cat["_id"],
+            "title": sug["title"],
+            "status": "watching",
+            "progress": sug.get("episode") or 0,
+            "season": sug.get("season"),
+            "cover_url": sug.get("cover_url") or "",
+            "source": "extension",
+            "created_at": now_iso(),
+            "updated_at": now_iso(),
+        }
+        r = await db.titles.insert_one(doc)
+        title_id = str(r.inserted_id)
+
+    await db.suggestions.update_one({"_id": _id}, {"$set": {"status": "accepted", "title_id": title_id}})
+    return {"ok": True, "title_id": title_id}
+
+
+# ---------- Extension endpoints (X-API-Key) ----------
+@api.get("/extension/ping")
+async def extension_ping(user=Depends(get_user_by_api_key)):
+    return {"ok": True, "user": {"id": str(user["_id"]), "email": user["email"]}}
+
+@api.post("/extension/scan")
+async def extension_scan(payload: SuggestionIn, user=Depends(get_user_by_api_key)):
+    """Called by the Hanabi browser extension when it detects media on screen.
+    Creates a pending suggestion the user can accept/reject from the inbox.
+    If auto_accept policy is on, may auto-add. For MVP we always create a suggestion."""
+
+    # try to resolve category from hint
+    cat_slug = payload.category_slug
+    if not cat_slug and payload.category_hint:
+        hint = payload.category_hint.lower()
+        mapping = {
+            "anime": "anime", "manga": "manga", "kdrama": "kdramas",
+            "korean drama": "kdramas", "thai bl": "thai-bl", "bl": "thai-bl",
+            "book": "books", "novel": "books",
+        }
+        for k, v in mapping.items():
+            if k in hint:
+                cat_slug = v
+                break
+
+    # Dedup: if a pending suggestion with same title already exists, just update episode.
+    existing = await db.suggestions.find_one({
+        "user_id": user["_id"],
+        "title": payload.title,
+        "status": "pending",
+    })
+    if existing:
+        update = {"updated_at": now_iso()}
+        if payload.episode is not None:
+            update["episode"] = payload.episode
+        if payload.season is not None:
+            update["season"] = payload.season
+        if payload.cover_url:
+            update["cover_url"] = payload.cover_url
+        await db.suggestions.update_one({"_id": existing["_id"]}, {"$set": update})
+        return {"ok": True, "suggestion_id": str(existing["_id"]), "deduped": True}
+
+    doc = {
+        "user_id": user["_id"],
+        "title": payload.title,
+        "category_slug": cat_slug,
+        "category_hint": payload.category_hint,
+        "season": payload.season,
+        "episode": payload.episode,
+        "cover_url": payload.cover_url or "",
+        "source_url": payload.source_url,
+        "status": "pending",
+        "created_at": now_iso(),
+        "updated_at": now_iso(),
+    }
+    res = await db.suggestions.insert_one(doc)
+    return {"ok": True, "suggestion_id": str(res.inserted_id)}
+
+
+# ---------- Startup ----------
+@app.on_event("startup")
+async def startup():
+    await db.users.create_index("email", unique=True)
+    await db.categories.create_index([("user_id", 1), ("slug", 1)])
+    await db.titles.create_index([("user_id", 1), ("category_id", 1)])
+    await db.suggestions.create_index([("user_id", 1), ("status", 1)])
+    await db.api_keys.create_index("key_hash")
+
+    # seed admin
+    admin_email = os.environ.get("ADMIN_EMAIL", "admin@hanabi.app")
+    admin_password = os.environ.get("ADMIN_PASSWORD", "hanabi123")
+    existing = await db.users.find_one({"email": admin_email})
+    if not existing:
+        res = await db.users.insert_one({
+            "email": admin_email,
+            "name": "Admin",
+            "password_hash": hash_password(admin_password),
+            "theme": "tokyo-twilight",
+            "created_at": now_iso(),
+        })
+        cats = [
+            {**c, "user_id": res.inserted_id, "is_default": True, "created_at": now_iso()}
+            for c in DEFAULT_CATEGORIES
+        ]
+        await db.categories.insert_many(cats)
+
+@app.on_event("shutdown")
+async def shutdown():
+    client.close()
+
+
+# ---------- Register router + CORS ----------
+app.include_router(api)
 
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_origins=os.environ.get("CORS_ORIGINS", "*").split(","),
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
-
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    client.close()
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
