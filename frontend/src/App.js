@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, Outlet } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import "@/App.css";
 import { Toaster } from "@/components/ui/sonner";
@@ -15,11 +15,19 @@ import AuthCallback from "@/pages/AuthCallback";
 import Layout from "@/components/Layout";
 import { PageTransition } from "@/lib/motion";
 
-function Protected({ children }) {
+// Persistent layout route — sidebar stays mounted, only the page-content area transitions.
+function ProtectedLayout() {
   const { user, loading } = useAuth();
+  const location = useLocation();
   if (loading) return <div className="min-h-screen grid place-items-center text-muted-foreground">Loading…</div>;
   if (!user) return <Navigate to="/login" replace />;
-  return <Layout><PageTransition>{children}</PageTransition></Layout>;
+  return (
+    <Layout>
+      <AnimatePresence mode="wait" initial={false}>
+        <PageTransition key={location.pathname}><Outlet /></PageTransition>
+      </AnimatePresence>
+    </Layout>
+  );
 }
 
 function PublicOnly({ children }) {
@@ -29,25 +37,24 @@ function PublicOnly({ children }) {
   return children;
 }
 
-// Catch the OAuth fragment BEFORE any normal route runs (synchronous, no useEffect).
 function AppRoutes() {
   const location = useLocation();
   if (location.hash?.includes("session_id=")) return <AuthCallback />;
   return (
-    <AnimatePresence mode="wait" initial={false}>
-      <Routes location={location} key={location.pathname}>
-        <Route path="/login" element={<PublicOnly><Login /></PublicOnly>} />
-        <Route path="/register" element={<PublicOnly><Register /></PublicOnly>} />
-        <Route path="/auth/callback" element={<AuthCallback />} />
-        <Route path="/u/:username" element={<PublicProfile />} />
-        <Route path="/u/:username/c/:slug" element={<PublicProfile />} />
-        <Route path="/" element={<Protected><Dashboard /></Protected>} />
-        <Route path="/activity" element={<Protected><Activity /></Protected>} />
-        <Route path="/c/:id" element={<Protected><Category /></Protected>} />
-        <Route path="/settings" element={<Protected><Settings /></Protected>} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </AnimatePresence>
+    <Routes>
+      <Route path="/login" element={<PublicOnly><Login /></PublicOnly>} />
+      <Route path="/register" element={<PublicOnly><Register /></PublicOnly>} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
+      <Route path="/u/:username" element={<PublicProfile />} />
+      <Route path="/u/:username/c/:slug" element={<PublicProfile />} />
+      <Route element={<ProtectedLayout />}>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/activity" element={<Activity />} />
+        <Route path="/c/:id" element={<Category />} />
+        <Route path="/settings" element={<Settings />} />
+      </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }
 

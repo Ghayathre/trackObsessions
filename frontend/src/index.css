@@ -351,6 +351,23 @@ body {
   --font-display: "Plus Jakarta Sans", ui-sans-serif, system-ui;
   --font-body: "Plus Jakarta Sans", ui-sans-serif, system-ui;
   --radius: 0.25rem;
+  --background: 0 0% 99%;
+  --foreground: 0 0% 8%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 8%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 8%;
+  --primary: 0 0% 10%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 0 0% 95%;
+  --secondary-foreground: 0 0% 12%;
+  --muted: 0 0% 95%;
+  --muted-foreground: 0 0% 40%;
+  --accent: 0 0% 18%;
+  --accent-foreground: 0 0% 100%;
+  --border: 0 0% 89%;
+  --input: 0 0% 89%;
+  --ring: 0 0% 10%;
 }
 .style-minimalist h1, .style-minimalist h2, .style-minimalist h3, .style-minimalist h4 { letter-spacing: -0.04em; font-weight: 700; }
 
@@ -358,17 +375,51 @@ body {
   --font-display: "Bungee", "Cabinet Grotesk", cursive;
   --font-body: "Outfit", ui-sans-serif;
   --radius: 1.25rem;
+  --background: 280 60% 8%;
+  --foreground: 50 100% 95%;
+  --card: 280 50% 14%;
+  --card-foreground: 50 100% 95%;
+  --popover: 280 50% 14%;
+  --popover-foreground: 50 100% 95%;
+  --primary: 50 100% 60%;
+  --primary-foreground: 280 60% 8%;
+  --secondary: 320 95% 60%;
+  --secondary-foreground: 280 60% 8%;
+  --muted: 280 40% 22%;
+  --muted-foreground: 50 60% 80%;
+  --accent: 180 100% 55%;
+  --accent-foreground: 280 60% 8%;
+  --border: 280 40% 25%;
+  --input: 280 40% 25%;
+  --ring: 50 100% 60%;
 }
 .style-retro-arcade h1, .style-retro-arcade h2 { letter-spacing: 0; }
-.style-retro-arcade body::before {
+.style-retro-arcade::before {
   content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 40;
-  background-image: repeating-linear-gradient(0deg, transparent 0, transparent 3px, rgba(255,255,255,0.025) 3px, rgba(255,255,255,0.025) 4px);
+  background-image: repeating-linear-gradient(0deg, transparent 0, transparent 3px, rgba(255,255,255,0.04) 3px, rgba(255,255,255,0.04) 4px);
 }
 
 .style-mid-century {
   --font-display: "Sora", ui-sans-serif;
   --font-body: "Sora", ui-sans-serif;
   --radius: 0.5rem;
+  --background: 36 30% 92%;
+  --foreground: 20 30% 18%;
+  --card: 36 40% 96%;
+  --card-foreground: 20 30% 18%;
+  --popover: 36 40% 96%;
+  --popover-foreground: 20 30% 18%;
+  --primary: 12 65% 50%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 175 55% 38%;
+  --secondary-foreground: 0 0% 100%;
+  --muted: 36 25% 88%;
+  --muted-foreground: 20 20% 40%;
+  --accent: 40 85% 55%;
+  --accent-foreground: 20 30% 18%;
+  --border: 36 25% 82%;
+  --input: 36 25% 82%;
+  --ring: 12 65% 50%;
 }
 .style-mid-century h1, .style-mid-century h2 { font-weight: 600; letter-spacing: -0.01em; }
 
@@ -376,8 +427,23 @@ body {
   --font-display: "Playfair Display", Georgia, serif;
   --font-body: "EB Garamond", Georgia, serif;
   --radius: 0.35rem;
-}
-.style-vintage-paper {
+  --background: 42 35% 90%;
+  --foreground: 28 40% 18%;
+  --card: 42 50% 94%;
+  --card-foreground: 28 40% 18%;
+  --popover: 42 50% 94%;
+  --popover-foreground: 28 40% 18%;
+  --primary: 25 55% 32%;
+  --primary-foreground: 42 50% 94%;
+  --secondary: 35 40% 75%;
+  --secondary-foreground: 28 40% 18%;
+  --muted: 42 30% 86%;
+  --muted-foreground: 28 25% 38%;
+  --accent: 18 60% 45%;
+  --accent-foreground: 42 50% 94%;
+  --border: 30 25% 75%;
+  --input: 30 25% 75%;
+  --ring: 25 55% 32%;
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='p'><feTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='2'/><feColorMatrix values='0 0 0 0 0.55  0 0 0 0 0.42  0 0 0 0 0.25  0 0 0 0.05 0'/></filter><rect width='100%' height='100%' filter='url(%23p)'/></svg>");
 }
 
@@ -385,6 +451,23 @@ body {
   --font-display: "Cinzel Decorative", "Cabinet Grotesk", serif;
   --font-body: "Cormorant Garamond", Georgia, serif;
   --radius: 0.9rem;
+  --background: 285 30% 10%;
+  --foreground: 45 60% 92%;
+  --card: 285 30% 15%;
+  --card-foreground: 45 60% 92%;
+  --popover: 285 30% 15%;
+  --popover-foreground: 45 60% 92%;
+  --primary: 45 80% 55%;
+  --primary-foreground: 285 30% 10%;
+  --secondary: 350 60% 50%;
+  --secondary-foreground: 45 60% 92%;
+  --muted: 285 25% 22%;
+  --muted-foreground: 45 30% 75%;
+  --accent: 25 80% 60%;
+  --accent-foreground: 285 30% 10%;
+  --border: 285 25% 28%;
+  --input: 285 25% 28%;
+  --ring: 45 80% 55%;
 }
 .style-filigree h1, .style-filigree h2 { letter-spacing: 0.04em; font-weight: 700; }
 
@@ -392,11 +475,28 @@ body {
   --font-display: "Orbitron", ui-sans-serif;
   --font-body: "JetBrains Mono", ui-monospace, monospace;
   --radius: 0;
+  --background: 240 25% 5%;
+  --foreground: 180 100% 92%;
+  --card: 240 25% 9%;
+  --card-foreground: 180 100% 92%;
+  --popover: 240 25% 9%;
+  --popover-foreground: 180 100% 92%;
+  --primary: 180 100% 55%;
+  --primary-foreground: 240 25% 5%;
+  --secondary: 320 100% 60%;
+  --secondary-foreground: 240 25% 5%;
+  --muted: 240 20% 15%;
+  --muted-foreground: 180 30% 70%;
+  --accent: 60 100% 55%;
+  --accent-foreground: 240 25% 5%;
+  --border: 180 50% 20%;
+  --input: 180 50% 20%;
+  --ring: 180 100% 55%;
 }
 .style-cyberpunk h1, .style-cyberpunk h2 { letter-spacing: 0.08em; text-transform: uppercase; font-weight: 800; }
-.style-cyberpunk body::after {
+.style-cyberpunk::after {
   content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 40;
-  background: repeating-linear-gradient(180deg, transparent 0, transparent 2px, rgba(255,255,255,0.03) 2px, rgba(255,255,255,0.03) 3px);
+  background: repeating-linear-gradient(180deg, transparent 0, transparent 2px, rgba(0,255,255,0.04) 2px, rgba(0,255,255,0.04) 3px);
 }
 
 .style-doodle {
@@ -404,6 +504,23 @@ body {
   --font-body: "Caveat", cursive;
   --radius: 1.4rem;
   font-size: 1.05rem;
+  --background: 45 95% 96%;
+  --foreground: 220 60% 18%;
+  --card: 0 0% 100%;
+  --card-foreground: 220 60% 18%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 220 60% 18%;
+  --primary: 220 70% 50%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 0 80% 70%;
+  --secondary-foreground: 0 0% 100%;
+  --muted: 45 50% 90%;
+  --muted-foreground: 220 30% 40%;
+  --accent: 30 90% 55%;
+  --accent-foreground: 0 0% 100%;
+  --border: 220 30% 75%;
+  --input: 220 30% 75%;
+  --ring: 220 70% 50%;
 }
 .style-doodle h1, .style-doodle h2 { font-weight: 400; letter-spacing: 0; }
 
@@ -411,6 +528,23 @@ body {
   --font-display: "Shippori Mincho", "Noto Serif JP", serif;
   --font-body: "Shippori Mincho", "Noto Serif JP", serif;
   --radius: 0;
+  --background: 30 8% 94%;
+  --foreground: 0 0% 8%;
+  --card: 30 10% 97%;
+  --card-foreground: 0 0% 8%;
+  --popover: 30 10% 97%;
+  --popover-foreground: 0 0% 8%;
+  --primary: 0 0% 10%;
+  --primary-foreground: 30 10% 97%;
+  --secondary: 0 70% 38%;
+  --secondary-foreground: 30 10% 97%;
+  --muted: 30 8% 88%;
+  --muted-foreground: 0 0% 30%;
+  --accent: 0 60% 35%;
+  --accent-foreground: 30 10% 97%;
+  --border: 0 0% 72%;
+  --input: 0 0% 72%;
+  --ring: 0 0% 10%;
 }
 .style-sumi-ink h1, .style-sumi-ink h2 { font-weight: 800; letter-spacing: 0.02em; }
 
@@ -419,6 +553,23 @@ body {
   --font-body: "VT323", monospace;
   --radius: 0;
   font-size: 1.05rem;
+  --background: 240 60% 6%;
+  --foreground: 110 100% 70%;
+  --card: 240 50% 12%;
+  --card-foreground: 110 100% 70%;
+  --popover: 240 50% 12%;
+  --popover-foreground: 110 100% 70%;
+  --primary: 60 100% 50%;
+  --primary-foreground: 240 60% 6%;
+  --secondary: 0 100% 55%;
+  --secondary-foreground: 240 60% 6%;
+  --muted: 240 40% 18%;
+  --muted-foreground: 110 50% 60%;
+  --accent: 290 100% 65%;
+  --accent-foreground: 240 60% 6%;
+  --border: 240 40% 25%;
+  --input: 240 40% 25%;
+  --ring: 60 100% 50%;
 }
 .style-pixel-8bit h1, .style-pixel-8bit h2 { letter-spacing: 0; font-weight: 400; line-height: 1.4; }
 .style-pixel-8bit h1 { font-size: 2.5rem !important; }
@@ -428,6 +579,23 @@ body {
   --font-display: "Anton", "Cabinet Grotesk", sans-serif;
   --font-body: "Space Mono", ui-monospace, monospace;
   --radius: 0;
+  --background: 0 0% 95%;
+  --foreground: 0 0% 5%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 5%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 5%;
+  --primary: 12 85% 50%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 0 0% 12%;
+  --secondary-foreground: 0 0% 100%;
+  --muted: 0 0% 90%;
+  --muted-foreground: 0 0% 25%;
+  --accent: 50 95% 55%;
+  --accent-foreground: 0 0% 5%;
+  --border: 0 0% 5%;
+  --input: 0 0% 75%;
+  --ring: 12 85% 50%;
 }
 .style-brutalist h1, .style-brutalist h2 { letter-spacing: 0; text-transform: uppercase; }
 
@@ -435,6 +603,23 @@ body {
   --font-display: "Italiana", serif;
   --font-body: "Cormorant", serif;
   --radius: 0.15rem;
+  --background: 220 30% 8%;
+  --foreground: 45 80% 88%;
+  --card: 220 30% 13%;
+  --card-foreground: 45 80% 88%;
+  --popover: 220 30% 13%;
+  --popover-foreground: 45 80% 88%;
+  --primary: 45 75% 55%;
+  --primary-foreground: 220 30% 8%;
+  --secondary: 165 35% 45%;
+  --secondary-foreground: 220 30% 8%;
+  --muted: 220 25% 20%;
+  --muted-foreground: 45 30% 70%;
+  --accent: 0 50% 50%;
+  --accent-foreground: 45 80% 88%;
+  --border: 45 25% 30%;
+  --input: 45 25% 30%;
+  --ring: 45 75% 55%;
 }
 .style-art-deco h1, .style-art-deco h2 { letter-spacing: 0.1em; font-weight: 400; text-transform: uppercase; }
 
@@ -442,12 +627,28 @@ body {
   --font-display: "Caveat", cursive;
   --font-body: "Crimson Pro", Georgia, serif;
   --radius: 1rem;
+  --background: 205 50% 95%;
+  --foreground: 210 50% 18%;
+  --card: 0 0% 100%;
+  --card-foreground: 210 50% 18%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 210 50% 18%;
+  --primary: 200 70% 50%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 340 60% 70%;
+  --secondary-foreground: 0 0% 100%;
+  --muted: 205 30% 90%;
+  --muted-foreground: 210 30% 40%;
+  --accent: 290 50% 65%;
+  --accent-foreground: 0 0% 100%;
+  --border: 205 30% 84%;
+  --input: 205 30% 84%;
+  --ring: 200 70% 50%;
+  background-image: radial-gradient(at 20% 30%, hsl(var(--primary) / 0.10) 0px, transparent 50%),
+                    radial-gradient(at 80% 70%, hsl(var(--accent) / 0.10) 0px, transparent 50%),
+                    radial-gradient(at 60% 10%, hsl(var(--secondary) / 0.10) 0px, transparent 40%);
 }
 .style-watercolor h1, .style-watercolor h2 { font-weight: 600; letter-spacing: 0; }
-.style-watercolor {
-  background-image: radial-gradient(at 20% 30%, hsl(var(--primary) / 0.06) 0px, transparent 50%),
-                    radial-gradient(at 80% 70%, hsl(var(--accent) / 0.05) 0px, transparent 50%);
-}
 
 /* Decorative noise overlay */
 .noise::after {

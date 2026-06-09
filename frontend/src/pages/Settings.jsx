@@ -159,7 +159,7 @@ export default function Settings() {
       <section>
         <h2 className="font-display font-bold text-2xl mb-3">Styles</h2>
         <p className="text-sm text-muted-foreground mb-5 max-w-2xl">
-          Styles control <i>form</i> — fonts, corner radius, textures. Mix any Style with any Theme.
+          Styles control the whole <i>vibe</i> — fonts, radius, textures <b>and</b> colour palette. Pick <b>Hanabi Default</b> if you want the Theme picker above to drive colour; pick any other style for a curated complete look.
         </p>
         <StylePicker />
       </section>

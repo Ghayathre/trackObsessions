@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { Button } from "./ui/button";
 import HanabiInbox from "./HanabiInbox";
+import SnapToAddDialog from "./SnapToAddDialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -83,6 +84,9 @@ export default function Layout({ children }) {
         <nav className="px-3 flex flex-col gap-1">
           <SideLink to="/" icon={<Home className="w-4 h-4" />} label="Dashboard" testid="nav-dashboard" />
           <SideLink to="/activity" icon={<ActivityIcon className="w-4 h-4" />} label="Activity" testid="nav-activity" />
+          <div className="px-2 py-1.5">
+            <SnapToAddDialog categories={cats} onAdded={() => loadCats()} />
+          </div>
           <button
             onClick={() => setInboxOpen(true)}
             data-testid="nav-inbox"

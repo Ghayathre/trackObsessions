@@ -5,8 +5,11 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
 import os
+import re
 import logging
 import secrets
+import base64
+import json as _json
 from typing import List, Optional, Annotated
 from datetime import datetime, timezone, timedelta
 
@@ -14,7 +17,7 @@ import bcrypt
 import jwt
 import httpx
 from bson import ObjectId
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, Header, Query
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, Header, Query, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, BeforeValidator, ConfigDict, EmailStr, Field
@@ -49,6 +52,62 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 def get_jwt_secret() -> str:
     return os.environ["JWT_SECRET"]
+
+
+# ---------- Image detection (GPT-5.4 vision) ----------
+DETECT_SYSTEM_PROMPT = """You are Hanabi's media identifier. Given an image (usually a screenshot or photo of a tv/anime scene, a book cover, or a manga page), identify what's on screen.
+
+Return a STRICT JSON object with EXACTLY these fields and nothing else:
+{
+  "title": string,                // best-guess title; "" if unsure
+  "type": "anime"|"kdrama"|"thai-bl"|"manga"|"book"|"tv"|"unknown",
+  "characters": [string],         // visible character or actor names
+  "year": string,                 // 4-digit year if certain, else ""
+  "country": string,              // primary country / origin if known, else ""
+  "synopsis": string,             // 1-2 sentence context, else ""
+  "confident": boolean,           // true ONLY if title AND visible characters belong to the same work
+  "reason": string                // 1 line explaining the decision (for debugging)
+}
+
+Rules:
+- If you can read a title in subtitles, channel watermark, or on a book/manga cover, treat that as strong evidence.
+- If characters/actors visible don't match the title you're guessing, set confident=false and explain why.
+- For Thai BL or K-drama, prefer the original (Korean/Thai) title over English where applicable.
+- Do not invent characters or actors you don't see.
+- NEVER output anything except the JSON object — no markdown fences, no prose."""
+
+async def _gpt5_detect(image_bytes: bytes, mime: str) -> dict:
+    from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+    key = os.environ.get("EMERGENT_LLM_KEY")
+    if not key:
+        raise HTTPException(status_code=500, detail="LLM key not configured")
+    b64 = base64.b64encode(image_bytes).decode()
+    chat = LlmChat(
+        api_key=key,
+        session_id=f"hanabi-detect-{secrets.token_hex(6)}",
+        system_message=DETECT_SYSTEM_PROMPT,
+    ).with_model("openai", "gpt-4o")
+    msg = UserMessage(
+        text="Identify the title shown. Respond with the JSON object only.",
+        file_contents=[ImageContent(image_base64=b64)],
+    )
+    text = await chat.send_message(msg)
+    if not isinstance(text, str):
+        text = str(text)
+    cleaned = text.strip()
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", cleaned, flags=re.IGNORECASE | re.MULTILINE).strip()
+    try:
+        return _json.loads(cleaned)
+    except Exception:
+        m = re.search(r"\{[\s\S]*\}", cleaned)
+        if m:
+            try:
+                return _json.loads(m.group(0))
+            except Exception:
+                pass
+        return {"title": "", "type": "unknown", "characters": [], "confident": False,
+                "reason": "Model returned non-JSON.", "raw": cleaned[:400]}
 
 
 # ---------- Activity log ----------
@@ -1223,6 +1282,77 @@ async def startup():
 @app.on_event("shutdown")
 async def shutdown():
     client.close()
+
+
+# ---------- Image detection endpoint (uses helper defined above) ----------
+@api.post("/detect/image")
+async def detect_image(image: UploadFile = File(...), user=Depends(get_current_user)):
+    if (image.content_type or "").lower() not in ("image/jpeg", "image/jpg", "image/png", "image/webp"):
+        raise HTTPException(status_code=400, detail="Only JPEG/PNG/WEBP supported")
+    raw = await image.read()
+    if not raw:
+        raise HTTPException(status_code=400, detail="Empty file")
+    if len(raw) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Image too large (max 5MB)")
+    try:
+        result = await _gpt5_detect(raw, image.content_type)
+    except HTTPException:
+        raise
+    except Exception:
+        logging.exception("detect failed")
+        raise HTTPException(status_code=502, detail="Detection service unavailable")
+
+    poster = ""
+    detail = None
+    title = (result.get("title") or "").strip()
+    rtype = (result.get("type") or "unknown").lower()
+    kind_map = {"anime": "anime", "manga": "manga", "book": "books",
+                "kdrama": "tv", "thai-bl": "tv", "tv": "tv"}
+    kind = kind_map.get(rtype)
+    if title and kind:
+        try:
+            async with httpx.AsyncClient(timeout=6.0) as cli:
+                if kind in ("anime", "manga"):
+                    r = await cli.get(f"https://api.jikan.moe/v4/{kind}", params={"q": title, "limit": 1})
+                    data = (r.json() or {}).get("data") or []
+                    if data:
+                        d = data[0]
+                        poster = ((d.get("images") or {}).get("jpg") or {}).get("image_url") or ""
+                        detail = {
+                            "external_id": str(d.get("mal_id")),
+                            "external_source": f"jikan-{kind}",
+                            "total": d.get("episodes") if kind == "anime" else d.get("chapters"),
+                        }
+                elif kind == "tv":
+                    r = await cli.get("https://api.tvmaze.com/search/shows", params={"q": title})
+                    arr = r.json() or []
+                    if arr:
+                        s = arr[0].get("show") or {}
+                        img = s.get("image") or {}
+                        poster = img.get("original") or img.get("medium") or ""
+                        detail = {
+                            "external_id": f"tvmaze-{s.get('id')}",
+                            "external_source": "tvmaze",
+                        }
+                elif kind == "books":
+                    r = await cli.get("https://openlibrary.org/search.json", params={"q": title, "limit": 1})
+                    docs = (r.json() or {}).get("docs") or []
+                    if docs:
+                        d = docs[0]
+                        cover_id = d.get("cover_i")
+                        if cover_id:
+                            poster = f"https://covers.openlibrary.org/b/id/{cover_id}-L.jpg"
+                        detail = {
+                            "external_id": d.get("key", ""),
+                            "external_source": "openlibrary",
+                        }
+        except Exception:
+            pass
+
+    result["cover_url"] = poster
+    if detail:
+        result.update(detail)
+    return result
 
 
 # ---------- Register router + CORS ----------
