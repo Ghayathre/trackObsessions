@@ -8,6 +8,7 @@ import Register from "@/pages/Register";
 import Dashboard from "@/pages/Dashboard";
 import Category from "@/pages/Category";
 import Settings from "@/pages/Settings";
+import Activity from "@/pages/Activity";
 import PublicProfile from "@/pages/PublicProfile";
 import Layout from "@/components/Layout";
 
@@ -35,6 +36,7 @@ export default function App() {
             <Route path="/register" element={<PublicOnly><Register /></PublicOnly>} />
             <Route path="/u/:username" element={<PublicProfile />} />
             <Route path="/" element={<Protected><Dashboard /></Protected>} />
+            <Route path="/activity" element={<Protected><Activity /></Protected>} />
             <Route path="/c/:id" element={<Protected><Category /></Protected>} />
             <Route path="/settings" element={<Protected><Settings /></Protected>} />
             <Route path="*" element={<Navigate to="/" replace />} />

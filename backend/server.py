@@ -28,12 +28,14 @@ db = client[os.environ["DB_NAME"]]
 JWT_ALGORITHM = "HS256"
 ACCESS_TTL_MIN = 60 * 24 * 7  # 7 days for hobby app convenience
 DEFAULT_CATEGORIES = [
-    {"slug": "kdramas", "name": "K-Dramas", "icon": "Clapperboard", "kind": "video"},
-    {"slug": "thai-bl", "name": "Thai BLs", "icon": "Heart", "kind": "video"},
-    {"slug": "anime", "name": "Anime", "icon": "Sparkles", "kind": "video"},
-    {"slug": "manga", "name": "Manga", "icon": "BookOpen", "kind": "reading"},
-    {"slug": "books", "name": "Books", "icon": "Library", "kind": "reading"},
+    {"slug": "kdramas", "name": "K-Dramas", "icon": "Clapperboard", "kind": "video", "minutes_per_unit": 60},
+    {"slug": "thai-bl", "name": "Thai BLs", "icon": "Heart", "kind": "video", "minutes_per_unit": 45},
+    {"slug": "anime", "name": "Anime", "icon": "Sparkles", "kind": "video", "minutes_per_unit": 24},
+    {"slug": "manga", "name": "Manga", "icon": "BookOpen", "kind": "reading", "minutes_per_unit": 8},
+    {"slug": "books", "name": "Books", "icon": "Library", "kind": "reading", "minutes_per_unit": 3},
 ]
+
+DEFAULT_MINUTES = {"video": 40, "reading": 5, "custom": 20}
 
 # ---------- Helpers ----------
 def hash_password(password: str) -> str:
@@ -47,6 +49,26 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 def get_jwt_secret() -> str:
     return os.environ["JWT_SECRET"]
+
+
+# ---------- Activity log ----------
+async def log_activity(user_id, type_: str, *, title: str = "", title_id=None,
+                       category_id=None, category_name: str = "",
+                       extra: Optional[dict] = None):
+    """Best-effort activity log entry. Never raises."""
+    try:
+        await db.activity.insert_one({
+            "user_id": user_id,
+            "type": type_,  # add | progress | status | complete | remove | extension_add
+            "title": title,
+            "title_id": str(title_id) if title_id else None,
+            "category_id": category_id,
+            "category_name": category_name,
+            "extra": extra or {},
+            "created_at": now_iso(),
+        })
+    except Exception:
+        logging.exception("activity log failed")
 
 def create_access_token(user_id: str, email: str) -> str:
     payload = {
@@ -367,6 +389,9 @@ async def create_title(payload: TitleIn, user=Depends(get_current_user)):
     res = await db.titles.insert_one(doc)
     d = serialize({**doc, "_id": res.inserted_id})
     d["category_id"] = str(cat_id)
+    await log_activity(user["_id"], "extension_add" if doc["source"] == "extension" else "add",
+                       title=doc["title"], title_id=res.inserted_id,
+                       category_id=str(cat_id), category_name=cat.get("name", ""))
     return d
 
 @api.patch("/titles/{title_id}")
@@ -376,23 +401,43 @@ async def update_title(title_id: str, payload: TitleUpdate, user=Depends(get_cur
     if not update:
         raise HTTPException(status_code=400, detail="No fields to update")
     update["updated_at"] = now_iso()
-    res = await db.titles.update_one({"_id": _id, "user_id": user["_id"]}, {"$set": update})
-    if res.matched_count == 0:
+    before = await db.titles.find_one({"_id": _id, "user_id": user["_id"]})
+    if not before:
         raise HTTPException(status_code=404, detail="Title not found")
+    await db.titles.update_one({"_id": _id, "user_id": user["_id"]}, {"$set": update})
     t = await db.titles.find_one({"_id": _id})
+    cat = await db.categories.find_one({"_id": t["category_id"]})
+    cat_name = cat.get("name", "") if cat else ""
+    # log meaningful changes
+    if "status" in update and update["status"] != before.get("status"):
+        type_ = "complete" if update["status"] == "completed" else "status"
+        await log_activity(user["_id"], type_, title=t["title"], title_id=t["_id"],
+                           category_id=str(t["category_id"]), category_name=cat_name,
+                           extra={"from": before.get("status"), "to": update["status"]})
+    elif "progress" in update and (update["progress"] or 0) != (before.get("progress") or 0):
+        await log_activity(user["_id"], "progress", title=t["title"], title_id=t["_id"],
+                           category_id=str(t["category_id"]), category_name=cat_name,
+                           extra={"from": before.get("progress") or 0, "to": update["progress"]})
     d = serialize(t)
     d["category_id"] = str(t["category_id"])
     return d
 
 @api.delete("/titles/{title_id}")
 async def delete_title(title_id: str, user=Depends(get_current_user)):
-    res = await db.titles.delete_one({"_id": oid(title_id), "user_id": user["_id"]})
-    if res.deleted_count == 0:
+    _id = oid(title_id)
+    before = await db.titles.find_one({"_id": _id, "user_id": user["_id"]})
+    if not before:
         raise HTTPException(status_code=404, detail="Title not found")
+    await db.titles.delete_one({"_id": _id})
+    await log_activity(user["_id"], "remove", title=before.get("title", ""),
+                       title_id=_id, category_id=str(before.get("category_id")))
     return {"ok": True}
 
 
 # ---------- Stats ----------
+def _minutes_for(cat: dict) -> int:
+    return int(cat.get("minutes_per_unit") or DEFAULT_MINUTES.get(cat.get("kind"), 30))
+
 @api.get("/stats")
 async def stats(user=Depends(get_current_user)):
     total = await db.titles.count_documents({"user_id": user["_id"]})
@@ -406,14 +451,53 @@ async def stats(user=Depends(get_current_user)):
         d = serialize(t)
         d["category_id"] = str(t["category_id"])
         recent_out.append(d)
+
+    # per-category breakdown + hours
+    cats = await db.categories.find({"user_id": user["_id"]}).to_list(500)
+    by_category = []
+    total_minutes = 0
+    for c in cats:
+        titles_in = await db.titles.find(
+            {"user_id": user["_id"], "category_id": c["_id"]},
+            {"progress": 1, "total": 1, "status": 1},
+        ).to_list(2000)
+        mins_per = _minutes_for(c)
+        units = 0
+        for t in titles_in:
+            # if completed and we know total, use total; else use progress
+            if t.get("status") == "completed" and t.get("total"):
+                units += int(t["total"] or 0)
+            else:
+                units += int(t.get("progress") or 0)
+        minutes = units * mins_per
+        total_minutes += minutes
+        by_category.append({
+            "id": str(c["_id"]),
+            "slug": c.get("slug"),
+            "name": c.get("name"),
+            "kind": c.get("kind"),
+            "count": len(titles_in),
+            "minutes": minutes,
+            "hours": round(minutes / 60, 1),
+        })
+
     return {
         "total": total,
         "watching": watching,
         "completed": completed,
         "plan": plan,
         "pending_suggestions": pending,
+        "minutes": total_minutes,
+        "hours": round(total_minutes / 60, 1),
+        "by_category": by_category,
         "recent": recent_out,
     }
+
+@api.get("/activity")
+async def activity(user=Depends(get_current_user), limit: int = 50):
+    limit = min(max(limit, 1), 200)
+    items = await db.activity.find({"user_id": user["_id"]}).sort("created_at", -1).limit(limit).to_list(limit)
+    return [serialize(a) for a in items]
 
 
 # ---------- Metadata search ----------
@@ -574,6 +658,9 @@ async def act_on_suggestion(sug_id: str, payload: SuggestionAction, user=Depends
         title_id = str(r.inserted_id)
 
     await db.suggestions.update_one({"_id": _id}, {"$set": {"status": "accepted", "title_id": title_id}})
+    await log_activity(user["_id"], "extension_add", title=sug.get("title", ""),
+                       title_id=title_id, category_id=str(cat["_id"]),
+                       category_name=cat.get("name", ""))
     return {"ok": True, "title_id": title_id}
 
 
@@ -672,6 +759,9 @@ async def extension_scan(payload: SuggestionIn, user=Depends(get_user_by_api_key
                 {"_id": res.inserted_id},
                 {"$set": {"status": "accepted", "title_id": title_id, "auto_accepted": True}},
             )
+            await log_activity(user["_id"], "extension_add", title=payload.title,
+                               title_id=title_id, category_id=str(cat["_id"]),
+                               category_name=cat.get("name", ""), extra={"auto": True})
             return {"ok": True, "suggestion_id": suggestion_id, "auto_accepted": True, "title_id": title_id}
 
     return {"ok": True, "suggestion_id": suggestion_id}
@@ -734,6 +824,7 @@ async def startup():
     await db.titles.create_index([("user_id", 1), ("category_id", 1)])
     await db.suggestions.create_index([("user_id", 1), ("status", 1)])
     await db.api_keys.create_index("key_hash")
+    await db.activity.create_index([("user_id", 1), ("created_at", -1)])
 
     # Backfill username for any user missing it (one-shot)
     async for u in db.users.find({"$or": [{"username": {"$exists": False}}, {"username": None}]}):

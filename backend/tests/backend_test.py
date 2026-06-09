@@ -308,3 +308,120 @@ def test_extension_scan_without_auto_accept_creates_only_pending(admin_headers):
     requests.post(f"{API}/suggestions/{sug_id}/act", headers=admin_headers, json={"action": "reject"})
     requests.delete(f"{API}/api-keys/{key_id}", headers=admin_headers)
     requests.patch(f"{API}/auth/settings", headers=admin_headers, json={"auto_accept": True})
+
+
+
+# ---------- NEW FEATURES (iteration 3): Activity log + Hours stats ----------
+
+def _register_fresh_user():
+    email = f"test_{uuid.uuid4().hex[:8]}@example.com"
+    r = requests.post(f"{API}/auth/register",
+                      json={"email": email, "password": "secret123", "name": "Activity Tester"})
+    assert r.status_code == 200, r.text
+    return {"Authorization": f"Bearer {r.json()['token']}"}, r.json()["user"]["id"]
+
+
+def test_stats_returns_hours_and_by_category_shape(admin_headers):
+    r = requests.get(f"{API}/stats", headers=admin_headers)
+    assert r.status_code == 200, r.text
+    s = r.json()
+    for k in ("hours", "minutes", "by_category"):
+        assert k in s, f"missing {k}"
+    assert isinstance(s["by_category"], list)
+    assert isinstance(s["hours"], (int, float))
+    assert isinstance(s["minutes"], int)
+    assert abs(s["hours"] - round(s["minutes"] / 60, 1)) < 1e-6
+    for row in s["by_category"]:
+        for k in ("id", "slug", "name", "kind", "count", "minutes", "hours"):
+            assert k in row, f"missing {k} in by_category row"
+
+
+def test_kdrama_two_episodes_yield_120_minutes_2_hours():
+    headers, _ = _register_fresh_user()
+    cats = requests.get(f"{API}/categories", headers=headers).json()
+    kd = next(c for c in cats if c["slug"] == "kdramas")
+    tr = requests.post(f"{API}/titles", headers=headers, json={
+        "title": "TEST_HoursDrama", "category_id": kd["id"], "status": "watching", "progress": 2,
+    })
+    assert tr.status_code == 200, tr.text
+
+    s = requests.get(f"{API}/stats", headers=headers).json()
+    kd_row = next(c for c in s["by_category"] if c["slug"] == "kdramas")
+    assert kd_row["minutes"] == 120, f"expected 120, got {kd_row}"
+    assert kd_row["hours"] == 2.0, f"expected 2.0h, got {kd_row['hours']}"
+    assert s["minutes"] >= 120
+    assert s["hours"] >= 2.0
+
+
+def test_activity_requires_auth():
+    r = requests.get(f"{API}/activity")
+    assert r.status_code == 401
+
+
+def test_activity_logs_lifecycle_events_and_limit_capping():
+    headers, _ = _register_fresh_user()
+    cats = requests.get(f"{API}/categories", headers=headers).json()
+    kd = next(c for c in cats if c["slug"] == "kdramas")
+
+    title_name = f"TEST_Lifecycle_{uuid.uuid4().hex[:5]}"
+    tr = requests.post(f"{API}/titles", headers=headers, json={
+        "title": title_name, "category_id": kd["id"], "status": "watching", "progress": 1,
+    })
+    tid = tr.json()["id"]
+    requests.patch(f"{API}/titles/{tid}", headers=headers, json={"progress": 5})
+    requests.patch(f"{API}/titles/{tid}", headers=headers, json={"status": "on_hold"})
+    requests.patch(f"{API}/titles/{tid}", headers=headers, json={"status": "completed"})
+    requests.delete(f"{API}/titles/{tid}", headers=headers)
+
+    time.sleep(0.3)
+    r = requests.get(f"{API}/activity", headers=headers, params={"limit": 50})
+    assert r.status_code == 200
+    items = r.json()
+    types = [a["type"] for a in items if a.get("title") == title_name]
+    for expected in ("add", "progress", "status", "complete", "remove"):
+        assert expected in types, f"missing '{expected}' in {types}"
+
+    prog = next(a for a in items if a.get("title") == title_name and a["type"] == "progress")
+    assert prog["extra"]["from"] == 1 and prog["extra"]["to"] == 5
+    comp = next(a for a in items if a.get("title") == title_name and a["type"] == "complete")
+    assert comp["extra"]["to"] == "completed"
+
+    r2 = requests.get(f"{API}/activity", headers=headers, params={"limit": 2}).json()
+    assert len(r2) <= 2
+
+    r3 = requests.get(f"{API}/activity", headers=headers, params={"limit": 9999})
+    assert r3.status_code == 200
+    assert len(r3.json()) <= 200
+
+
+def test_activity_logged_for_suggestion_accept_and_auto_accept():
+    headers, _ = _register_fresh_user()
+
+    requests.patch(f"{API}/auth/settings", headers=headers, json={"auto_accept": False})
+    rk = requests.post(f"{API}/api-keys", headers=headers, json={"label": "TEST_act_key"})
+    raw = rk.json()["key"]
+
+    sug_title = f"TEST_SugAccept_{uuid.uuid4().hex[:5]}"
+    s = requests.post(f"{API}/extension/scan", headers={"X-API-Key": raw},
+                      json={"title": sug_title, "category_hint": "kdrama", "episode": 1})
+    sug_id = s.json()["suggestion_id"]
+    a = requests.post(f"{API}/suggestions/{sug_id}/act", headers=headers, json={"action": "accept"})
+    assert a.status_code == 200
+
+    time.sleep(0.3)
+    items = requests.get(f"{API}/activity", headers=headers).json()
+    accepted = [x for x in items if x.get("title") == sug_title and x["type"] == "extension_add"]
+    assert accepted, "manual accept should log extension_add"
+    assert accepted[0]["extra"].get("auto") is not True
+
+    requests.patch(f"{API}/auth/settings", headers=headers, json={"auto_accept": True})
+    auto_title = f"TEST_AutoAccept_{uuid.uuid4().hex[:5]}"
+    s2 = requests.post(f"{API}/extension/scan", headers={"X-API-Key": raw},
+                       json={"title": auto_title, "category_hint": "anime", "episode": 1})
+    assert s2.json().get("auto_accepted") is True
+
+    time.sleep(0.3)
+    items2 = requests.get(f"{API}/activity", headers=headers).json()
+    auto = [x for x in items2 if x.get("title") == auto_title and x["type"] == "extension_add"]
+    assert auto, "auto-accept should log extension_add"
+    assert auto[0]["extra"].get("auto") is True

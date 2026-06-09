@@ -5,7 +5,7 @@ import { useTheme } from "../context/ThemeContext";
 import api from "../lib/api";
 import {
   Home, Settings, Plus, LogOut, Sparkles, Bell, Flame,
-  Clapperboard, Heart, BookOpen, Library, Hash
+  Clapperboard, Heart, BookOpen, Library, Hash, Activity as ActivityIcon
 } from "lucide-react";
 import { Button } from "./ui/button";
 import HanabiInbox from "./HanabiInbox";
@@ -82,6 +82,7 @@ export default function Layout({ children }) {
 
         <nav className="px-3 flex flex-col gap-1">
           <SideLink to="/" icon={<Home className="w-4 h-4" />} label="Dashboard" testid="nav-dashboard" />
+          <SideLink to="/activity" icon={<ActivityIcon className="w-4 h-4" />} label="Activity" testid="nav-activity" />
           <button
             onClick={() => setInboxOpen(true)}
             data-testid="nav-inbox"

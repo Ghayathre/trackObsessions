@@ -1,0 +1,36 @@
+{
+  "summary": "Validated two new P1 features (Activity timeline + Hours-watched stats). All 20 backend pytest tests pass (5 new). All frontend surfaces verified: Dashboard hours tile, by-category chart, recent activity card, /activity route, Activity sidebar link.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py grew to ~873 lines — still over the 700-line guideline. Recommend splitting into routers/{auth,categories,titles,stats,activity,suggestions,extension,public}.py with a shared deps module.",
+    "log_activity is invoked sequentially after the main write; consider asyncio.create_task fire-and-forget for lower latency on POST /titles & PATCH /titles since the result is best-effort.",
+    "GET /api/stats does N+1 DB calls (one find per category to compute by_category). Acceptable now but will be slow once a user has many custom categories — switch to a single $group aggregation keyed by category_id.",
+    "GET /api/activity has no pagination cursor — only limit. For long-lived accounts the timeline will need a 'before=<created_at>' style cursor.",
+    "ActivityFeed.jsx uses index as React key fallback (key={a.id || i}) — fine here since server always returns id, but worth dropping the fallback to surface bugs early.",
+    "Dashboard.jsx uses Math.max(1, ...by_category.map(c=>c.hours)); when by_category is [] this is Math.max(1) = 1 which is safe. OK.",
+    "Activity 'progress' description shows 'ep' even for reading kinds (manga/books) — minor UX polish: switch label by category.kind (ep vs ch vs pg).",
+    "DEFAULT_MINUTES fallback uses cat.get('kind') without normalizing — custom categories created via UI default to kind='custom' (20m), which is fine.",
+    "@app.on_event startup/shutdown still uses the deprecated FastAPI hooks — should move to a lifespan context manager.",
+    "stat-hours card uses bg-primary/10 border-primary/30 — contrast looks good in tokyo-twilight theme; verify on lighter themes (sakura-noir, etc) for AA contrast on the gradient text."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py"
+  ],
+  "success_rate": {"backend": "100% (20/20)", "frontend": "100% on tested flows"},
+  "test_credentials": "admin@hanabi.app / hanabi123 — admin currently has profile_public=true, auto_accept=true. Admin currently has 'True Beauty' and 'Squid Game' titles plus generated activity from prior test runs.",
+  "seed_data_creation": "Tests create transient users (test_*@example.com) and TEST_*-prefixed titles/keys, all cleaned up. Admin's existing titles (True Beauty, Squid Game) untouched.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Activity timeline + hours stats fully working end-to-end. Backend testids: GET /api/stats returns {minutes, hours, by_category:[{id,slug,name,kind,count,minutes,hours}]}; GET /api/activity is auth-required with limit param (capped at 200). Frontend selectors: data-testid stat-hours, hours-chart, chart-row-{slug}, activity-item-{i}, nav-activity. Dashboard shows up to 6 activity items; /activity page uses limit=100. Verified all 6 activity types render with correct icons + copy: add (+), progress (↑ with ep from→to), status (Tv2, 'Moved to <i>status</i>'), complete (CheckCircle2, 'Finished … 🎉'), remove (Trash2), extension_add (RadioTower, 'Hanabi added/auto-added … from the extension'). Suggestion accept and auto-accept paths both log extension_add with extra.auto=true on auto.",
+  "rca of the issue": "n/a — no bugs found. One transient false-positive during the first browser run: the script checked stat-hours immediately after login while React state was still null (renders '—'). Fixed by waiting on page.wait_for_function until stat-total !== '—'. This is a test-script timing concern, not a product bug."
+}
