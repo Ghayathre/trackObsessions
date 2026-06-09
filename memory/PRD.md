@@ -38,10 +38,14 @@
 - **Activity timeline**: per-user `activity` log with 6 event types (add, progress, status, complete, remove, extension_add). New `GET /api/activity` endpoint. New `/activity` page + sidebar nav link. Compact 6-item recent-activity card on Dashboard.
 - **Hours-watched stats**: `minutes_per_unit` on categories (kdramas=60, anime=24, thai-bl=45, manga=8, books=3, custom=20). `GET /api/stats` now returns `hours`, `minutes`, and `by_category` breakdown. Dashboard gets a gradient "Hours logged" tile + "Hours by collection" bar chart.
 
+## v1.3 (2026-02, iteration 4)
+- **Google OAuth** (Emergent-managed) on /login and /register; exchanges Google `session_id` for our normal `access_token` cookie via `POST /api/auth/google/session`. Creates user + seeds 5 default categories on first sign-in; links to existing email account when emails match.
+- **AniList bulk import** (`POST /api/import/anilist`): paste a public AniList username + pick a target collection, statuses are mapped (CURRENT→watching, COMPLETED→completed, etc), scores converted to 0-10 rating, dedupes on `al-<id>` external_id within the category.
+- **Per-collection share links**: new public route `/u/:username/c/:slug`. Share button on Category page (only when public profile is on) copies the link.
+
 ## Backlog
 ### P1
-- OAuth/Google sign-in (in addition to email/password)
-- Bulk import (MAL/AniList/Goodreads) into a category
+- Bulk import from MAL & Goodreads
 - Per-category statistics + hours watched estimate
 - Activity timeline page
 

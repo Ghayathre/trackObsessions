@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -59,10 +59,10 @@ export default function ImportAniListDialog() {
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Import from AniList</DialogTitle>
+          <DialogDescription>
+            Paste your AniList username and pick the collection to import into. Your list must be public on AniList.
+          </DialogDescription>
         </DialogHeader>
-        <p className="text-xs text-muted-foreground">
-          Paste your AniList username and pick the collection to import into. Your list must be public on AniList.
-        </p>
         <form onSubmit={run} className="space-y-3">
           <div>
             <Label htmlFor="al-user">AniList username</Label>
