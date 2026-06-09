@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Card } from "./ui/card";
-import { Star, Plus, Minus, Trash2 } from "lucide-react";
+import { Star, Plus, Minus, Trash2, RefreshCw, Globe, Calendar, Hash } from "lucide-react";
 import api from "../lib/api";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
@@ -30,9 +30,25 @@ export default function MediaCard({ item, onChange, kind = "video" }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(item);
   const [coverFailed, setCoverFailed] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   // reset cover failure when item changes
   useEffect(() => { setCoverFailed(false); }, [item.cover_url]);
+
+  const refreshDetails = async () => {
+    setRefreshing(true);
+    try {
+      const { data } = await api.post(`/titles/${item.id}/refresh`);
+      onChange?.(data);
+      setDraft(data);
+      toast.success("Details refreshed");
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      toast.error(typeof detail === "string" ? detail : "Could not refresh");
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const inc = async (delta) => {
     const next = Math.max(0, (item.progress || 0) + delta);
@@ -111,9 +127,66 @@ export default function MediaCard({ item, onChange, kind = "video" }) {
       </Card>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>{item.title}</DialogTitle></DialogHeader>
-          <div className="space-y-3">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid={`detail-dialog-${item.id}`}>
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-display font-black tracking-tight">{item.title}</DialogTitle>
+            {(item.year || item.country) && (
+              <DialogDescription className="flex flex-wrap items-center gap-3 text-xs">
+                {item.year && <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {item.year}</span>}
+                {item.country && <span className="flex items-center gap-1"><Globe className="w-3 h-3" /> {item.country}</span>}
+                {item.external_source && <span className="flex items-center gap-1 opacity-70"><Hash className="w-3 h-3" /> {item.external_source}</span>}
+              </DialogDescription>
+            )}
+          </DialogHeader>
+
+          <div className="grid grid-cols-[120px_1fr] gap-5">
+            {/* poster */}
+            <div className="space-y-2">
+              {item.cover_url && !coverFailed ? (
+                <img
+                  src={item.cover_url}
+                  alt=""
+                  referrerPolicy="no-referrer"
+                  onError={() => setCoverFailed(true)}
+                  className="w-full aspect-[2/3] object-cover rounded-lg border border-border"
+                />
+              ) : (
+                <div className="w-full aspect-[2/3] rounded-lg bg-muted grid place-items-center text-xs p-2 text-center border border-border">{item.title}</div>
+              )}
+              {item.external_id && item.external_source && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full text-xs"
+                  onClick={refreshDetails}
+                  disabled={refreshing}
+                  data-testid={`refresh-${item.id}`}
+                >
+                  <RefreshCw className={`w-3 h-3 mr-1 ${refreshing ? "animate-spin" : ""}`} />
+                  {refreshing ? "Refreshing…" : "Refresh details"}
+                </Button>
+              )}
+            </div>
+
+            {/* info + synopsis */}
+            <div className="min-w-0 space-y-3">
+              {item.synopsis && (
+                <div>
+                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">About</div>
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{item.synopsis}</p>
+                </div>
+              )}
+              {!item.synopsis && item.external_id && (
+                <p className="text-xs text-muted-foreground italic">No synopsis stored yet. Click "Refresh details" to fetch it.</p>
+              )}
+              {!item.external_id && !item.synopsis && (
+                <p className="text-xs text-muted-foreground italic">This title was added manually. Re-add via search to pull in synopsis & episode count.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="border-t border-border pt-4 mt-2">
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-3">Your progress</div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Status</Label>
@@ -137,12 +210,12 @@ export default function MediaCard({ item, onChange, kind = "video" }) {
                 <Input type="number" value={draft.total ?? ""} onChange={(e) => setDraft({ ...draft, total: e.target.value })} />
               </div>
             </div>
-            <div>
+            <div className="mt-3">
               <Label>Cover URL</Label>
               <Input value={draft.cover_url || ""} onChange={(e) => setDraft({ ...draft, cover_url: e.target.value })} />
             </div>
-            <div>
-              <Label>Notes</Label>
+            <div className="mt-3">
+              <Label>Notes (private)</Label>
               <Textarea value={draft.notes || ""} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} rows={3} />
             </div>
           </div>

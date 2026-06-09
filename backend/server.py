@@ -145,6 +145,10 @@ class TitleIn(BaseModel):
     cover_url: Optional[str] = ""
     source: Optional[str] = "manual"  # manual | extension
     external_id: Optional[str] = None
+    external_source: Optional[str] = None  # jikan | tvmaze | openlibrary | anilist
+    synopsis: Optional[str] = ""
+    year: Optional[str] = ""
+    country: Optional[str] = ""
 
 class TitleUpdate(BaseModel):
     title: Optional[str] = None
@@ -499,6 +503,10 @@ async def create_title(payload: TitleIn, user=Depends(get_current_user)):
         "cover_url": payload.cover_url or "",
         "source": payload.source or "manual",
         "external_id": payload.external_id,
+        "external_source": payload.external_source,
+        "synopsis": payload.synopsis or "",
+        "year": payload.year or "",
+        "country": payload.country or "",
         "created_at": now_iso(),
         "updated_at": now_iso(),
     }
@@ -548,6 +556,98 @@ async def delete_title(title_id: str, user=Depends(get_current_user)):
     await log_activity(user["_id"], "remove", title=before.get("title", ""),
                        title_id=_id, category_id=str(before.get("category_id")))
     return {"ok": True}
+
+
+async def _fetch_one_detail(external_source: str, external_id: str) -> Optional[dict]:
+    """Fetch a single title's metadata from its source. Returns a dict of
+    fields to merge into a title doc, or None."""
+    if not external_id or not external_source:
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as cli:
+            if external_source in ("jikan-anime", "jikan-manga"):
+                kind = external_source.split("-")[1]
+                r = await cli.get(f"https://api.jikan.moe/v4/{kind}/{external_id}")
+                if r.status_code != 200:
+                    return None
+                d = (r.json() or {}).get("data") or {}
+                aired = d.get("aired") or d.get("published") or {}
+                studios = d.get("studios") or []
+                return {
+                    "title": d.get("title") or d.get("title_english"),
+                    "cover_url": (d.get("images", {}).get("jpg", {}) or {}).get("image_url"),
+                    "total": d.get("episodes") if kind == "anime" else d.get("chapters"),
+                    "synopsis": d.get("synopsis") or "",
+                    "year": (aired.get("from") or "")[:4],
+                    "country": (studios[0]["name"] if studios else ("Japan" if kind == "anime" else "")),
+                }
+            elif external_source == "tvmaze":
+                tid = external_id.replace("tvmaze-", "")
+                r = await cli.get(f"https://api.tvmaze.com/shows/{tid}")
+                if r.status_code != 200:
+                    return None
+                s = r.json() or {}
+                img = s.get("image") or {}
+                # also fetch total episode count
+                ep_count = None
+                try:
+                    er = await cli.get(f"https://api.tvmaze.com/shows/{tid}/episodes")
+                    if er.status_code == 200:
+                        ep_count = len(er.json() or [])
+                except Exception:
+                    pass
+                return {
+                    "title": s.get("name"),
+                    "cover_url": img.get("original") or img.get("medium") or "",
+                    "total": ep_count,
+                    "synopsis": _strip_html(s.get("summary") or ""),
+                    "year": (s.get("premiered") or "")[:4],
+                    "country": ((s.get("network") or {}).get("country") or {}).get("name") or "",
+                }
+            elif external_source == "openlibrary":
+                # external_id looks like "/works/OL12345W"
+                path = external_id if external_id.startswith("/") else f"/works/{external_id}"
+                r = await cli.get(f"https://openlibrary.org{path}.json")
+                if r.status_code != 200:
+                    return None
+                d = r.json() or {}
+                description = d.get("description")
+                if isinstance(description, dict):
+                    description = description.get("value", "")
+                covers = d.get("covers") or []
+                cover = f"https://covers.openlibrary.org/b/id/{covers[0]}-L.jpg" if covers else ""
+                return {
+                    "title": d.get("title"),
+                    "cover_url": cover,
+                    "synopsis": description or "",
+                    "year": str(d.get("first_publish_date") or "")[:4],
+                }
+    except Exception:
+        logging.exception("detail fetch failed")
+        return None
+    return None
+
+
+@api.post("/titles/{title_id}/refresh")
+async def refresh_title(title_id: str, user=Depends(get_current_user)):
+    _id = oid(title_id)
+    t = await db.titles.find_one({"_id": _id, "user_id": user["_id"]})
+    if not t:
+        raise HTTPException(status_code=404, detail="Title not found")
+    src = t.get("external_source")
+    ext = t.get("external_id")
+    if not src or not ext:
+        raise HTTPException(status_code=400, detail="This title has no linked source to refresh from. Re-add it via search.")
+    detail = await _fetch_one_detail(src, ext)
+    if not detail:
+        raise HTTPException(status_code=502, detail="Could not fetch fresh details right now")
+    update = {k: v for k, v in detail.items() if v not in (None, "")}
+    update["updated_at"] = now_iso()
+    await db.titles.update_one({"_id": _id}, {"$set": update})
+    updated = await db.titles.find_one({"_id": _id})
+    d = serialize(updated)
+    d["category_id"] = str(updated["category_id"])
+    return d
 
 
 # ---------- Stats ----------
@@ -639,17 +739,24 @@ async def metadata_search(
                 url = f"https://api.jikan.moe/v4/{kind}"
                 r = await cli.get(url, params={"q": q, "limit": 8})
                 data = r.json().get("data", [])
-                return [
-                    {
+                out = []
+                for d in data:
+                    aired = d.get("aired") or d.get("published") or {}
+                    year = (aired.get("from") or "")[:4]
+                    studios = d.get("studios") or []
+                    studio = studios[0]["name"] if studios else ""
+                    out.append({
                         "title": d.get("title"),
                         "cover_url": (d.get("images", {}).get("jpg", {}) or {}).get("image_url"),
                         "external_id": str(d.get("mal_id")),
+                        "external_source": f"jikan-{kind}",
                         "total": d.get("episodes") if kind == "anime" else d.get("chapters"),
                         "synopsis": d.get("synopsis"),
+                        "year": year,
+                        "country": studio or ("Japan" if kind == "anime" else ""),
                         "source": "jikan",
-                    }
-                    for d in data
-                ]
+                    })
+                return out
             elif kind == "tv":
                 r = await cli.get("https://api.tvmaze.com/search/shows", params={"q": q})
                 arr = r.json() or []
@@ -661,6 +768,7 @@ async def metadata_search(
                         "title": s.get("name"),
                         "cover_url": img.get("original") or img.get("medium") or "",
                         "external_id": f"tvmaze-{s.get('id')}",
+                        "external_source": "tvmaze",
                         "total": s.get("runtime"),  # minutes per ep — informational
                         "synopsis": _strip_html(s.get("summary") or ""),
                         "year": (s.get("premiered") or "")[:4],
@@ -679,8 +787,11 @@ async def metadata_search(
                         "title": d.get("title"),
                         "cover_url": cover,
                         "external_id": d.get("key", ""),
+                        "external_source": "openlibrary",
                         "total": d.get("number_of_pages_median"),
                         "synopsis": (d.get("author_name") or [""])[0],
+                        "year": str(d.get("first_publish_year") or ""),
+                        "country": "",
                         "source": "openlibrary",
                     })
                 return out

@@ -38,6 +38,7 @@ export default function AddTitleDialog({ categoryId, categoryKind = "video", cat
   const [progress, setProgress] = useState(0);
   const [season, setSeason] = useState("");
   const [coverUrl, setCoverUrl] = useState("");
+  const [meta, setMeta] = useState(null); // {synopsis, year, country, total, external_source}
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [touchedCover, setTouchedCover] = useState(false);
@@ -48,7 +49,7 @@ export default function AddTitleDialog({ categoryId, categoryKind = "video", cat
     if (!open) {
       setTitle(""); setProgress(0); setSeason(""); setCoverUrl("");
       setResults([]); setStatus("watching"); setTouchedCover(false);
-      setSelectedExtId(null);
+      setSelectedExtId(null); setMeta(null);
       setSource(defaultSourceFor(categorySlug, categoryKind));
     }
   }, [open, categorySlug, categoryKind]);
@@ -76,6 +77,14 @@ export default function AddTitleDialog({ categoryId, categoryKind = "video", cat
   const pick = (r) => {
     setTitle(r.title);
     setSelectedExtId(r.external_id || null);
+    setMeta({
+      synopsis: r.synopsis || "",
+      year: r.year || "",
+      country: r.country || "",
+      total: r.total || null,
+      external_source: r.external_source || r.source || "",
+      external_id: r.external_id || null,
+    });
     if (!touchedCover) setCoverUrl(r.cover_url || "");
   };
 
@@ -93,6 +102,12 @@ export default function AddTitleDialog({ categoryId, categoryKind = "video", cat
         progress: Number(progress) || 0,
         season: season ? Number(season) : null,
         cover_url: coverUrl,
+        external_id: meta?.external_id || null,
+        external_source: meta?.external_source || null,
+        synopsis: meta?.synopsis || "",
+        year: meta?.year || "",
+        country: meta?.country || "",
+        total: meta?.total || null,
       });
       toast.success(`Added "${data.title}"`);
       onAdded?.(data);
