@@ -29,16 +29,19 @@
 - Theme persistence per user (server) + localStorage fallback
 - Sonner toasts, sidebar with pending-suggestion badge
 
+## v1.1 (2026-02, iteration 2)
+- **Shareable public profiles**: per-user `profile_public` toggle, `GET /api/public/u/{username}` + `/u/:username` SPA route; respects the user's theme; strips private notes.
+- **Auto-accept policy**: per-user `auto_accept` toggle; when ON + extension provides a resolvable `category_hint`, `/api/extension/scan` adds/updates the title immediately (Suggestion is still recorded as `accepted` for audit).
+- `username` field added (unique, slugified, auto on register, editable in Settings); Settings page redesigned with Profile / Sharing / Auto-pilot sections.
+
 ## Backlog
 ### P1
 - OAuth/Google sign-in (in addition to email/password)
-- Auto-add policies (skip inbox if confidence high)
 - Bulk import (MAL/AniList/Goodreads) into a category
 - Per-category statistics + hours watched estimate
 - Activity timeline page
 
 ### P2
-- Public profile pages / shareable lists
 - Friends & cross-recs
 - Mobile PWA install + native share target
 - Custom theme builder (pick accent + radius + font)
