@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="popup.css" />
+    <title>Hanabi</title>
+  </head>
+  <body>
+    <header>
+      <img src="icons/icon32.png" alt="" width="24" height="24" />
+      <h1>Hanabi</h1>
+      <span id="status-dot" class="dot" title="Not connected"></span>
+    </header>
+
+    <!-- Setup: no key yet -->
+    <section id="setup" hidden>
+      <p class="muted">
+        Open the Hanabi web app → <b>Settings</b> → generate an extension key,
+        then paste it below.
+      </p>
+      <button id="open-settings" class="link">Open Hanabi Settings ↗</button>
+      <input id="key-input" type="password" placeholder="hnb_…" autocomplete="off" />
+      <button id="save-key" class="primary">Connect</button>
+      <p id="setup-msg" class="msg" hidden></p>
+    </section>
+
+    <!-- Connected -->
+    <section id="connected" hidden>
+      <p class="account">
+        Connected as <b id="email">your account</b>
+      </p>
+
+      <div class="row toggle-row">
+        <label for="auto-track">
+          <b>Auto-track</b>
+          <span class="muted">Add titles instantly while you watch/read.</span>
+        </label>
+        <input type="checkbox" id="auto-track" />
+      </div>
+
+      <div id="detection" class="card" hidden>
+        <div class="muted small">Detected on this page</div>
+        <div id="det-title" class="det-title"></div>
+        <button id="add-now" class="primary">Add to Hanabi</button>
+      </div>
+      <div id="no-detection" class="muted small" hidden>
+        Nothing detected on this page yet. Open a supported title page.
+      </div>
+
+      <p id="conn-msg" class="msg" hidden></p>
+
+      <footer>
+        <button id="test" class="link">Test connection</button>
+        <button id="forget" class="link danger">Forget key</button>
+      </footer>
+    </section>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>
