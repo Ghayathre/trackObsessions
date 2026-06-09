@@ -7,6 +7,10 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Switch } from "../components/ui/switch";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "../components/ui/alert-dialog";
 import { Copy, Trash2, KeyRound, ShieldAlert, User, Share2, ExternalLink, Sparkles, Download } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
@@ -38,7 +42,6 @@ export default function Settings() {
   };
 
   const revoke = async (id) => {
-    if (!confirm("Revoke this API key? The extension using it will lose access.")) return;
     await api.delete(`/api-keys/${id}`);
     await load();
     toast.success("Key revoked");
@@ -229,9 +232,27 @@ export default function Settings() {
                 <div className="text-xs text-muted-foreground">Last used: {k.last_used_at ? new Date(k.last_used_at).toLocaleString() : "never"}</div>
               </div>
               {!k.revoked && (
-                <Button size="sm" variant="outline" onClick={() => revoke(k.id)} data-testid={`revoke-apikey-${k.id}`}>
-                  <Trash2 className="w-3.5 h-3.5" />
-                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button size="sm" variant="outline" data-testid={`revoke-apikey-${k.id}`}>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Revoke "{k.label}"?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        The extension using this key will stop being able to push scans.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => revoke(k.id)} data-testid={`confirm-revoke-${k.id}`}>
+                        Revoke
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               )}
             </Card>
           ))}

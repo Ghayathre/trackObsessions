@@ -11,6 +11,10 @@ import { Button } from "./ui/button";
 import HanabiInbox from "./HanabiInbox";
 import SnapToAddDialog from "./SnapToAddDialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "./ui/alert-dialog";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { toast } from "sonner";
@@ -60,7 +64,6 @@ export default function Layout({ children }) {
   };
 
   const onDeleteCat = async (id) => {
-    if (!confirm("Delete this category and all its titles?")) return;
     await api.delete(`/categories/${id}`);
     await loadCats();
     toast.success("Category removed");
@@ -145,12 +148,29 @@ export default function Layout({ children }) {
                   <span className="text-xs text-muted-foreground">{c.count}</span>
                 </NavLink>
                 {!c.is_default && (
-                  <button
-                    onClick={() => onDeleteCat(c.id)}
-                    className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive px-2 transition"
-                    title="Delete"
-                    data-testid={`delete-category-${c.slug}`}
-                  >×</button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <button
+                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive px-2 transition"
+                        title="Delete"
+                        data-testid={`delete-category-${c.slug}`}
+                      >×</button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete "{c.name}"?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This removes the collection and all <b>{c.count}</b> title{c.count === 1 ? "" : "s"} inside it. This can't be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel data-testid={`cancel-delete-cat-${c.slug}`}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => onDeleteCat(c.id)} data-testid={`confirm-delete-cat-${c.slug}`}>
+                          Yes, delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 )}
               </div>
             );

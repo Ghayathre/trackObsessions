@@ -4,6 +4,10 @@ import { Star, Plus, Minus, Trash2, RefreshCw, Globe, Calendar, Hash } from "luc
 import { motion } from "framer-motion";
 import api from "../lib/api";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "./ui/alert-dialog";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
@@ -74,11 +78,14 @@ export default function MediaCard({ item, onChange, kind = "video" }) {
   };
 
   const remove = async () => {
-    if (!confirm(`Remove "${item.title}"?`)) return;
-    await api.delete(`/titles/${item.id}`);
-    onChange?.(null, item.id);
-    setOpen(false);
-    toast.success("Removed");
+    try {
+      await api.delete(`/titles/${item.id}`);
+      onChange?.(null, item.id);
+      setOpen(false);
+      toast.success("Removed");
+    } catch {
+      toast.error("Could not delete");
+    }
   };
 
   const progressLabel = kind === "reading" ? "Ch" : "Ep";
@@ -227,7 +234,27 @@ export default function MediaCard({ item, onChange, kind = "video" }) {
             </div>
           </div>
           <div className="flex gap-2 pt-2">
-            <Button variant="destructive" onClick={remove} data-testid={`delete-title-${item.id}`}><Trash2 className="w-4 h-4 mr-1" /> Delete</Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" data-testid={`delete-title-${item.id}`}>
+                  <Trash2 className="w-4 h-4 mr-1" /> Delete
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Remove "{item.title}"?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This deletes it from your collection. Your activity log keeps the history.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel data-testid={`cancel-delete-${item.id}`}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={remove} data-testid={`confirm-delete-${item.id}`}>
+                    Yes, remove
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
             <Button className="ml-auto" onClick={save} data-testid={`save-title-${item.id}`}>Save</Button>
           </div>
         </DialogContent>
