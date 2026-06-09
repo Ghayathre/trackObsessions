@@ -25,6 +25,7 @@ export default function Category() {
   const { id } = useParams();
   const { user } = useAuth();
   const [cat, setCat] = useState(null);
+  const [categories, setCategories] = useState([]);
   const [items, setItems] = useState([]);
   const [filter, setFilter] = useState("all");
   const [q, setQ] = useState("");
@@ -35,6 +36,7 @@ export default function Category() {
       listCategories(),
     ]);
     setItems(titles);
+    setCategories(cats);
     setCat(cats.find((c) => c.id === id));
   };
 
@@ -51,6 +53,8 @@ export default function Category() {
   const kind = cat?.kind === "reading" ? "reading" : "video";
   const onChange = (updated, deletedId) => {
     if (deletedId) setItems((cur) => cur.filter((i) => i.id !== deletedId));
+    // Moved to another collection -> it no longer belongs on this page.
+    else if (updated && updated.category_id !== id) setItems((cur) => cur.filter((i) => i.id !== updated.id));
     else if (updated) setItems((cur) => cur.map((i) => (i.id === updated.id ? updated : i)));
     else load();
   };
@@ -119,7 +123,7 @@ export default function Category() {
         >
           {items.map((t) => (
             <motion.div key={t.id} variants={staggerItem}>
-              <MediaCard item={t} kind={kind} onChange={onChange} />
+              <MediaCard item={t} kind={kind} onChange={onChange} categories={categories} />
             </motion.div>
           ))}
         </motion.div>

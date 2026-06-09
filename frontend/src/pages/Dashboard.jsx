@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getStats, listActivity } from "../lib/db";
+import { getStats, listActivity, listCategories } from "../lib/db";
 import { Link } from "react-router-dom";
 import { Card } from "../components/ui/card";
 import { TrendingUp, Eye, CheckCircle2, Bookmark, Sparkles, Timer } from "lucide-react";
@@ -25,11 +25,13 @@ function formatHours(h) {
 export default function Dashboard() {
   const [data, setData] = useState(null);
   const [activity, setActivity] = useState([]);
+  const [categories, setCategories] = useState([]);
 
   const load = async () => {
-    const [s, a] = await Promise.all([getStats(), listActivity(6)]);
+    const [s, a, cats] = await Promise.all([getStats(), listActivity(6), listCategories()]);
     setData(s);
     setActivity(a);
+    setCategories(cats);
   };
   useEffect(() => { load(); }, []);
 
@@ -159,7 +161,7 @@ export default function Dashboard() {
             >
               {data.recent.map((t) => (
                 <motion.div key={t.id} variants={staggerItem}>
-                  <MediaCard item={t} onChange={load} />
+                  <MediaCard item={t} onChange={load} categories={categories} />
                 </motion.div>
               ))}
             </motion.div>

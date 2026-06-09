@@ -31,7 +31,7 @@ const STATUS_COLOR = {
   dropped: "bg-destructive/15 text-destructive",
 };
 
-export default function MediaCard({ item, onChange, kind = "video" }) {
+export default function MediaCard({ item, onChange, kind = "video", categories = [] }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(item);
   const [coverFailed, setCoverFailed] = useState(false);
@@ -70,6 +70,9 @@ export default function MediaCard({ item, onChange, kind = "video" }) {
       notes: draft.notes,
       cover_url: draft.cover_url,
     };
+    if (draft.category_id && draft.category_id !== item.category_id) {
+      payload.category_id = draft.category_id;
+    }
     const data = await updateTitle(item.id, payload);
     onChange?.(data);
     setOpen(false);
@@ -223,6 +226,17 @@ export default function MediaCard({ item, onChange, kind = "video" }) {
                 <Input type="number" value={draft.total ?? ""} onChange={(e) => setDraft({ ...draft, total: e.target.value })} />
               </div>
             </div>
+            {categories.length > 0 && (
+              <div className="mt-3">
+                <Label>Collection</Label>
+                <Select value={draft.category_id} onValueChange={(v) => setDraft({ ...draft, category_id: v })}>
+                  <SelectTrigger data-testid={`edit-category-${item.id}`}><SelectValue placeholder="Choose a collection" /></SelectTrigger>
+                  <SelectContent>
+                    {categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="mt-3">
               <Label>Cover URL</Label>
               <Input value={draft.cover_url || ""} onChange={(e) => setDraft({ ...draft, cover_url: e.target.value })} />
