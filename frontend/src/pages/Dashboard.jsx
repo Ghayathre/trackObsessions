@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import api from "../lib/api";
+import { getStats, listActivity } from "../lib/db";
 import { Link } from "react-router-dom";
 import { Card } from "../components/ui/card";
 import { TrendingUp, Eye, CheckCircle2, Bookmark, Sparkles, Timer } from "lucide-react";
@@ -27,10 +27,7 @@ export default function Dashboard() {
   const [activity, setActivity] = useState([]);
 
   const load = async () => {
-    const [{ data: s }, { data: a }] = await Promise.all([
-      api.get("/stats"),
-      api.get("/activity", { params: { limit: 6 } }),
-    ]);
+    const [s, a] = await Promise.all([getStats(), listActivity(6)]);
     setData(s);
     setActivity(a);
   };

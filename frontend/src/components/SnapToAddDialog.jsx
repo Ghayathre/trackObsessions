@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Button } from "./ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Camera, Loader2, Sparkles, CheckCircle2, AlertTriangle, Upload } from "lucide-react";
-import api from "../lib/api";
+import { detectImage, createTitle } from "../lib/db";
 import { toast } from "sonner";
 
 const TYPE_TO_SLUG = {
@@ -49,16 +49,15 @@ export default function SnapToAddDialog({ categories = [], onAdded }) {
     setResult(null);
     setDetecting(true);
     try {
-      const fd = new FormData();
-      fd.append("image", f);
-      const { data } = await api.post("/detect/image", fd, {
-        headers: { "Content-Type": "multipart/form-data" },
-        timeout: 60000,
-      });
-      setResult(data);
+      const data = await detectImage(f);
+      if (data?.error === "not_implemented") {
+        toast.error(data.detail || "Image detection is unavailable right now");
+        setResult(null);
+      } else {
+        setResult(data);
+      }
     } catch (err) {
-      const detail = err.response?.data?.detail;
-      toast.error(typeof detail === "string" ? detail : "Could not analyse image");
+      toast.error(err.message || "Could not analyse image");
       setResult(null);
     } finally {
       setDetecting(false);
@@ -68,7 +67,7 @@ export default function SnapToAddDialog({ categories = [], onAdded }) {
   const confirmAdd = async () => {
     if (!result || !categoryId) return;
     try {
-      const { data } = await api.post("/titles", {
+      const data = await createTitle({
         title: result.title,
         category_id: categoryId,
         status: "watching",

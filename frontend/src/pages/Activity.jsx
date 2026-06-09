@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import api from "../lib/api";
+import { listActivity } from "../lib/db";
 import ActivityFeed from "../components/ActivityFeed";
 
 export default function Activity() {
   const [items, setItems] = useState(null);
   useEffect(() => {
-    api.get("/activity", { params: { limit: 100 } }).then(({ data }) => setItems(data));
+    listActivity(100).then(setItems).catch(() => setItems([]));
   }, []);
 
   return (

@@ -11,7 +11,6 @@ import Category from "@/pages/Category";
 import Settings from "@/pages/Settings";
 import Activity from "@/pages/Activity";
 import PublicProfile from "@/pages/PublicProfile";
-import AuthCallback from "@/pages/AuthCallback";
 import Layout from "@/components/Layout";
 import { PageTransition } from "@/lib/motion";
 
@@ -38,13 +37,10 @@ function PublicOnly({ children }) {
 }
 
 function AppRoutes() {
-  const location = useLocation();
-  if (location.hash?.includes("session_id=")) return <AuthCallback />;
   return (
     <Routes>
       <Route path="/login" element={<PublicOnly><Login /></PublicOnly>} />
       <Route path="/register" element={<PublicOnly><Register /></PublicOnly>} />
-      <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/u/:username" element={<PublicProfile />} />
       <Route path="/u/:username/c/:slug" element={<PublicProfile />} />
       <Route element={<ProtectedLayout />}>

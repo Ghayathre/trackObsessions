@@ -5,7 +5,8 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Plus, Loader2, Search } from "lucide-react";
-import api from "../lib/api";
+import { searchMetadata } from "../lib/metadata";
+import { createTitle } from "../lib/db";
 import { toast } from "sonner";
 
 // Map a category slug (or kind as a fallback) to the best default metadata source.
@@ -63,7 +64,7 @@ export default function AddTitleDialog({ categoryId, categoryKind = "video", cat
     debounceRef.current = setTimeout(async () => {
       setSearching(true);
       try {
-        const { data } = await api.get("/metadata/search", { params: { q, kind: source } });
+        const data = await searchMetadata(q, source);
         setResults(data || []);
       } catch {
         setResults([]);
@@ -95,7 +96,7 @@ export default function AddTitleDialog({ categoryId, categoryKind = "video", cat
     e.preventDefault();
     if (!title.trim()) return;
     try {
-      const { data } = await api.post("/titles", {
+      const data = await createTitle({
         title: title.trim(),
         category_id: categoryId,
         status,

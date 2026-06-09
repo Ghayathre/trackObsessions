@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "./ui/sheet";
 import { Button } from "./ui/button";
-import api from "../lib/api";
+import { listSuggestions, actOnSuggestion } from "../lib/db";
 import { Check, X, Tv, Sparkles } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { toast } from "sonner";
@@ -14,8 +14,7 @@ export default function HanabiInbox({ open, onOpenChange, categories }) {
   const load = async () => {
     setLoading(true);
     try {
-      const { data } = await api.get("/suggestions", { params: { status: "pending" } });
-      setItems(data);
+      setItems(await listSuggestions("pending"));
     } finally { setLoading(false); }
   };
 
@@ -23,9 +22,7 @@ export default function HanabiInbox({ open, onOpenChange, categories }) {
 
   const act = async (id, action) => {
     try {
-      const payload = { action };
-      if (action === "accept" && overrideCat[id]) payload.category_id = overrideCat[id];
-      await api.post(`/suggestions/${id}/act`, payload);
+      await actOnSuggestion(id, action, action === "accept" ? overrideCat[id] : undefined);
       setItems((cur) => cur.filter((s) => s.id !== id));
       toast.success(action === "accept" ? "Added to your list" : "Suggestion dismissed");
     } catch {

@@ -1,11 +1,9 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import axios from "axios";
-import { THEMES } from "../data/themes";
+import { getPublicProfile, getPublicTitles } from "../lib/db";
 import { Flame, Sparkles, Clapperboard, Heart, BookOpen, Library, Hash } from "lucide-react";
 import { Card } from "../components/ui/card";
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const ICONS = { Clapperboard, Heart, BookOpen, Library, Sparkles, Hash };
 
 const STATUS_COLOR = {
@@ -37,7 +35,7 @@ export default function PublicProfile() {
     let mounted = true;
     (async () => {
       try {
-        const { data } = await axios.get(`${API}/public/u/${username}`);
+        const data = await getPublicProfile(username);
         if (!mounted) return;
         setProfile(data);
         if (data.user.theme) {
@@ -53,7 +51,7 @@ export default function PublicProfile() {
           setActiveCat(data.categories[0].id);
         }
       } catch (e) {
-        setError(e.response?.status === 404 ? "This profile is private or doesn't exist." : "Could not load profile.");
+        setError(e.status === 404 ? "This profile is private or doesn't exist." : "Could not load profile.");
       }
     })();
     return () => { mounted = false; };
@@ -62,10 +60,11 @@ export default function PublicProfile() {
   useEffect(() => {
     if (!activeCat || !profile) return;
     (async () => {
-      const { data } = await axios.get(`${API}/public/u/${username}/titles`, { params: { category_id: activeCat } });
-      setTitles(data);
+      try {
+        setTitles(await getPublicTitles(profile.user.id, activeCat));
+      } catch { setTitles([]); }
     })();
-  }, [activeCat, profile, username]);
+  }, [activeCat, profile]);
 
   if (error) {
     return (

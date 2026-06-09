@@ -5,7 +5,7 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Download } from "lucide-react";
-import api from "../lib/api";
+import { listCategories, importAnilist } from "../lib/db";
 import { toast } from "sonner";
 
 export default function ImportAniListDialog() {
@@ -18,11 +18,11 @@ export default function ImportAniListDialog() {
 
   useEffect(() => {
     if (!open) return;
-    api.get("/categories").then(({ data }) => {
+    listCategories().then((data) => {
       setCats(data);
       const preferred = data.find((c) => c.slug === (type === "ANIME" ? "anime" : "manga"));
       setCategoryId(preferred?.id || data[0]?.id || "");
-    });
+    }).catch(() => {});
   }, [open, type]);
 
   const run = async (e) => {
@@ -33,17 +33,12 @@ export default function ImportAniListDialog() {
     }
     setLoading(true);
     try {
-      const { data } = await api.post("/import/anilist", {
-        username: username.trim(),
-        type,
-        category_id: categoryId,
-      });
+      const data = await importAnilist({ username: username.trim(), type, categoryId });
       toast.success(`Imported ${data.imported} title${data.imported === 1 ? "" : "s"}${data.skipped ? `, skipped ${data.skipped}` : ""}`);
       setOpen(false);
       setUsername("");
     } catch (err) {
-      const detail = err.response?.data?.detail;
-      toast.error(typeof detail === "string" ? detail : "Import failed");
+      toast.error(err.message || "Import failed");
     } finally {
       setLoading(false);
     }

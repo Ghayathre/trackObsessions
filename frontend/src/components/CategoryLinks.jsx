@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import api from "../lib/api";
+import { listLinks, createLink, deleteLink } from "../lib/db";
 import { Card } from "./ui/card";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
@@ -20,8 +20,7 @@ export default function CategoryLinks({ categoryId }) {
   const load = async () => {
     if (!categoryId) return;
     try {
-      const { data } = await api.get(`/categories/${categoryId}/links`);
-      setLinks(data);
+      setLinks(await listLinks(categoryId));
     } catch {}
   };
 
@@ -32,19 +31,18 @@ export default function CategoryLinks({ categoryId }) {
     if (!url.trim()) return;
     setAdding(true);
     try {
-      const { data } = await api.post(`/categories/${categoryId}/links`, { url: url.trim(), label: label.trim() });
+      const data = await createLink(categoryId, { url: url.trim(), label: label.trim() });
       setLinks((cur) => [...cur, data]);
       setUrl(""); setLabel("");
       toast.success("Site saved");
     } catch (err) {
-      const detail = err.response?.data?.detail;
-      toast.error(typeof detail === "string" ? detail : "Could not save link");
+      toast.error(err.message || "Could not save link");
     } finally { setAdding(false); }
   };
 
   const remove = async (id) => {
     try {
-      await api.delete(`/categories/${categoryId}/links/${id}`);
+      await deleteLink(id);
       setLinks((cur) => cur.filter((l) => l.id !== id));
     } catch { toast.error("Could not remove"); }
   };

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import api from "../lib/api";
+import { listApiKeys, createApiKey, revokeApiKey, updateProfile } from "../lib/db";
 import ThemePicker from "../components/ThemePicker";
 import StylePicker from "../components/StylePicker";
 import { Card } from "../components/ui/card";
@@ -26,8 +26,7 @@ export default function Settings() {
   const [savingProfile, setSavingProfile] = useState(false);
 
   const load = async () => {
-    const { data } = await api.get("/api-keys");
-    setKeys(data);
+    try { setKeys(await listApiKeys()); } catch {}
   };
   useEffect(() => { load(); }, []);
   useEffect(() => {
@@ -35,14 +34,14 @@ export default function Settings() {
   }, [user]);
 
   const create = async () => {
-    const { data } = await api.post("/api-keys", { label });
+    const data = await createApiKey(label);
     setRevealed(data);
     toast.success("Key created — copy it now");
     await load();
   };
 
   const revoke = async (id) => {
-    await api.delete(`/api-keys/${id}`);
+    await revokeApiKey(id);
     await load();
     toast.success("Key revoked");
   };
@@ -54,12 +53,11 @@ export default function Settings() {
 
   const updateSettings = async (patch, successMsg) => {
     try {
-      await api.patch("/auth/settings", patch);
+      await updateProfile(patch);
       await refresh();
       if (successMsg) toast.success(successMsg);
     } catch (err) {
-      const detail = err.response?.data?.detail;
-      toast.error(typeof detail === "string" ? detail : "Could not save");
+      toast.error(err.message || "Could not save");
     }
   };
 
@@ -69,7 +67,7 @@ export default function Settings() {
     setSavingProfile(false);
   };
 
-  const apiBase = `${process.env.REACT_APP_BACKEND_URL}/api`;
+  const scanEndpoint = `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/extension`;
   const publicUrl = user?.username ? `${window.location.origin}/u/${user.username}` : "";
 
   return (
@@ -193,9 +191,9 @@ export default function Settings() {
           <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Endpoint for your extension</div>
           <div className="flex items-center gap-2">
             <code className="text-xs sm:text-sm bg-muted px-3 py-2 rounded-md flex-1 overflow-x-auto whitespace-nowrap" data-testid="extension-endpoint">
-              POST {apiBase}/extension/scan  ·  header: X-API-Key
+              POST {scanEndpoint}  ·  header: X-API-Key
             </code>
-            <Button variant="outline" size="sm" onClick={() => copy(`${apiBase}/extension/scan`)}><Copy className="w-3 h-3" /></Button>
+            <Button variant="outline" size="sm" onClick={() => copy(scanEndpoint)}><Copy className="w-3 h-3" /></Button>
           </div>
           <div className="text-xs text-muted-foreground mt-3">
             Body: <code className="bg-muted px-1.5 py-0.5 rounded">{`{ title, category_hint?, season?, episode?, cover_url?, source_url? }`}</code>

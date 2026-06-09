@@ -2,7 +2,7 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
-import api from "../lib/api";
+import { listCategories, listSuggestions, createCategory, deleteCategory } from "../lib/db";
 import {
   Home, Settings, Plus, LogOut, Sparkles, Bell, Flame,
   Clapperboard, Heart, BookOpen, Library, Hash, Activity as ActivityIcon
@@ -32,12 +32,11 @@ export default function Layout({ children }) {
   const [newCatName, setNewCatName] = useState("");
 
   const loadCats = async () => {
-    const { data } = await api.get("/categories");
-    setCats(data);
+    try { setCats(await listCategories()); } catch {}
   };
   const loadPending = async () => {
     try {
-      const { data } = await api.get("/suggestions", { params: { status: "pending" } });
+      const data = await listSuggestions("pending");
       setPending(data.length);
     } catch {}
   };
@@ -53,7 +52,7 @@ export default function Layout({ children }) {
     e.preventDefault();
     if (!newCatName.trim()) return;
     try {
-      await api.post("/categories", { name: newCatName.trim(), icon: "Hash", kind: "custom" });
+      await createCategory({ name: newCatName.trim(), icon: "Hash", kind: "custom" });
       setNewCatName("");
       setNewCatOpen(false);
       await loadCats();
@@ -64,7 +63,7 @@ export default function Layout({ children }) {
   };
 
   const onDeleteCat = async (id) => {
-    await api.delete(`/categories/${id}`);
+    await deleteCategory(id);
     await loadCats();
     toast.success("Category removed");
     navigate("/");

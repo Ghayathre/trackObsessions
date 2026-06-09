@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Card } from "./ui/card";
 import { Star, Plus, Minus, Trash2, RefreshCw, Globe, Calendar, Hash } from "lucide-react";
 import { motion } from "framer-motion";
-import api from "../lib/api";
+import { refreshTitle, updateTitle, deleteTitle } from "../lib/db";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -43,13 +43,12 @@ export default function MediaCard({ item, onChange, kind = "video" }) {
   const refreshDetails = async () => {
     setRefreshing(true);
     try {
-      const { data } = await api.post(`/titles/${item.id}/refresh`);
+      const data = await refreshTitle(item.id);
       onChange?.(data);
       setDraft(data);
       toast.success("Details refreshed");
     } catch (err) {
-      const detail = err.response?.data?.detail;
-      toast.error(typeof detail === "string" ? detail : "Could not refresh");
+      toast.error(err.message || "Could not refresh");
     } finally {
       setRefreshing(false);
     }
@@ -57,7 +56,7 @@ export default function MediaCard({ item, onChange, kind = "video" }) {
 
   const inc = async (delta) => {
     const next = Math.max(0, (item.progress || 0) + delta);
-    const { data } = await api.patch(`/titles/${item.id}`, { progress: next });
+    const data = await updateTitle(item.id, { progress: next });
     onChange?.(data);
   };
 
@@ -71,7 +70,7 @@ export default function MediaCard({ item, onChange, kind = "video" }) {
       notes: draft.notes,
       cover_url: draft.cover_url,
     };
-    const { data } = await api.patch(`/titles/${item.id}`, payload);
+    const data = await updateTitle(item.id, payload);
     onChange?.(data);
     setOpen(false);
     toast.success("Updated");
@@ -79,7 +78,7 @@ export default function MediaCard({ item, onChange, kind = "video" }) {
 
   const remove = async () => {
     try {
-      await api.delete(`/titles/${item.id}`);
+      await deleteTitle(item.id);
       onChange?.(null, item.id);
       setOpen(false);
       toast.success("Removed");

@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import api from "../lib/api";
+import { updateProfile } from "../lib/db";
 import { THEMES } from "../data/themes";
 import { STYLES, DEFAULT_STYLE } from "../data/styles";
 import { useAuth } from "./AuthContext";
@@ -37,13 +37,13 @@ export function ThemeProvider({ children }) {
   const setTheme = async (slug) => {
     setThemeState(slug);
     localStorage.setItem("hanabi_theme", slug);
-    if (user) { try { await api.patch("/auth/theme", { theme: slug }); } catch {} }
+    if (user) { try { await updateProfile({ theme: slug }); } catch {} }
   };
 
   const setStyle = async (slug) => {
     setStyleState(slug);
     localStorage.setItem("hanabi_style", slug);
-    if (user) { try { await api.patch("/auth/settings", { style: slug }); } catch {} }
+    if (user) { try { await updateProfile({ style: slug }); } catch {} }
   };
 
   return (

@@ -1,0 +1,10 @@
+project_id = "yupganesyypaqhirgmbi"
+
+# The browser-extension endpoint authenticates by X-API-Key (no Supabase session),
+# so it must not require a Supabase JWT.
+[functions.extension]
+verify_jwt = false
+
+# Image detection is called by the React app with its Supabase session.
+[functions.detect-image]
+verify_jwt = true

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import api from "../lib/api";
+import { listTitles, listCategories } from "../lib/db";
 import MediaCard from "../components/MediaCard";
 import AddTitleDialog from "../components/AddTitleDialog";
 import CategoryLinks from "../components/CategoryLinks";
@@ -30,13 +30,9 @@ export default function Category() {
   const [q, setQ] = useState("");
 
   const load = async () => {
-    const params = {};
-    params.category_id = id;
-    if (filter !== "all") params.status = filter;
-    if (q) params.q = q;
-    const [{ data: titles }, { data: cats }] = await Promise.all([
-      api.get("/titles", { params }),
-      api.get("/categories"),
+    const [titles, cats] = await Promise.all([
+      listTitles({ categoryId: id, status: filter !== "all" ? filter : undefined, q: q || undefined }),
+      listCategories(),
     ]);
     setItems(titles);
     setCat(cats.find((c) => c.id === id));
