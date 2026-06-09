@@ -10,6 +10,7 @@ export default function HanabiInbox({ open, onOpenChange, categories }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [overrideCat, setOverrideCat] = useState({});
+  const [busy, setBusy] = useState({});
 
   const load = async () => {
     setLoading(true);
@@ -21,12 +22,14 @@ export default function HanabiInbox({ open, onOpenChange, categories }) {
   useEffect(() => { if (open) load(); }, [open]);
 
   const act = async (id, action) => {
+    setBusy((b) => ({ ...b, [id]: action }));
     try {
       await actOnSuggestion(id, action, action === "accept" ? overrideCat[id] : undefined);
       setItems((cur) => cur.filter((s) => s.id !== id));
       toast.success(action === "accept" ? "Added to your list" : "Suggestion dismissed");
     } catch {
       toast.error("Action failed");
+      setBusy((b) => { const n = { ...b }; delete n[id]; return n; });
     }
   };
 
@@ -78,10 +81,10 @@ export default function HanabiInbox({ open, onOpenChange, categories }) {
                 </div>
               </div>
               <div className="flex gap-2 mt-3">
-                <Button size="sm" className="flex-1" onClick={() => act(s.id, "accept")} data-testid={`suggestion-accept-${s.id}`}>
-                  <Check className="w-3.5 h-3.5 mr-1" /> Add
+                <Button size="sm" className="flex-1" disabled={!!busy[s.id]} onClick={() => act(s.id, "accept")} data-testid={`suggestion-accept-${s.id}`}>
+                  <Check className="w-3.5 h-3.5 mr-1" /> {busy[s.id] === "accept" ? "Adding…" : "Add"}
                 </Button>
-                <Button size="sm" variant="outline" className="flex-1" onClick={() => act(s.id, "reject")} data-testid={`suggestion-reject-${s.id}`}>
+                <Button size="sm" variant="outline" className="flex-1" disabled={!!busy[s.id]} onClick={() => act(s.id, "reject")} data-testid={`suggestion-reject-${s.id}`}>
                   <X className="w-3.5 h-3.5 mr-1" /> Dismiss
                 </Button>
               </div>

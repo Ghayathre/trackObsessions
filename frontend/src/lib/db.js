@@ -2,7 +2,7 @@
 // RLS scopes every query to the signed-in user; inserts must carry user_id.
 // Activity logging (previously done server-side in server.py) is replicated here best-effort.
 import { supabase, supabasePublic } from "./supabase";
-import { fetchDetail } from "./metadata";
+import { fetchDetail, searchMetadata } from "./metadata";
 
 const TITLE_COLS =
   "id, user_id, category_id, title, status, progress, total, season, rating, notes, " +
@@ -31,6 +31,37 @@ function unwrap({ data, error }) {
 // collections or were added/removed, so listeners can reload without a refresh.
 function notifyLibraryChanged() {
   try { window.dispatchEvent(new Event("hanabi:library-changed")); } catch { /* SSR / no window */ }
+}
+
+// Which external catalogue to search for a given collection.
+// Default collections map by slug; custom ones fall back to their kind.
+function searchKindFor(category) {
+  switch (category?.slug) {
+    case "anime": return "anime";
+    case "manga": return "manga";
+    case "books": return "books";
+    case "kdramas":
+    case "thai-bl": return "tv";
+    default: return category?.kind === "reading" ? "manga" : "tv";
+  }
+}
+
+// Look up a detected title in the matching catalogue and return the best match
+// (cover, synopsis, total, year, country, external_id/source) or null. Never throws.
+async function enrichForCategory(query, category) {
+  try {
+    const results = await searchMetadata(query, searchKindFor(category));
+    if (!results.length) return null;
+    const norm = (s) => (s || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+    const q = norm(query);
+    return (
+      results.find((r) => norm(r.title) === q) ||
+      results.find((r) => norm(r.title).includes(q) || q.includes(norm(r.title))) ||
+      results[0]
+    );
+  } catch {
+    return null;
+  }
 }
 
 // best-effort activity log; never throws
@@ -238,18 +269,22 @@ export async function actOnSuggestion(id, action, categoryId) {
   if (action !== "accept") throw new Error("Unknown action");
 
   // resolve category: explicit override -> suggestion's slug -> first category
+  const CAT_COLS = "id, name, slug, kind";
   let cat = null;
-  if (categoryId) cat = (await supabase.from("categories").select("id, name").eq("id", categoryId).maybeSingle()).data;
+  if (categoryId) cat = (await supabase.from("categories").select(CAT_COLS).eq("id", categoryId).maybeSingle()).data;
   if (!cat && sug.category_slug) {
-    cat = (await supabase.from("categories").select("id, name").eq("user_id", userId).eq("slug", sug.category_slug).maybeSingle()).data;
+    cat = (await supabase.from("categories").select(CAT_COLS).eq("user_id", userId).eq("slug", sug.category_slug).maybeSingle()).data;
   }
   if (!cat) {
-    cat = (await supabase.from("categories").select("id, name").eq("user_id", userId).order("created_at").limit(1).maybeSingle()).data;
+    cat = (await supabase.from("categories").select(CAT_COLS).eq("user_id", userId).order("created_at").limit(1).maybeSingle()).data;
   }
   if (!cat) throw new Error("No category available");
 
+  // Enrich from the matching catalogue (cover, synopsis, total, year, country, external link).
+  const meta = await enrichForCategory(sug.title, cat);
+
   const esc = sug.title.replace(/[%_\\]/g, (m) => "\\" + m);
-  const existing = (await supabase.from("titles").select("id, progress")
+  const existing = (await supabase.from("titles").select("id, progress, external_source")
     .eq("user_id", userId).eq("category_id", cat.id).ilike("title", esc).maybeSingle()).data;
 
   let titleId;
@@ -257,12 +292,26 @@ export async function actOnSuggestion(id, action, categoryId) {
     const update = { source: "extension" };
     if (sug.episode != null) update.progress = Math.max(existing.progress || 0, sug.episode);
     if (sug.season != null) update.season = sug.season;
+    // Backfill metadata only if this title was never linked to a source.
+    if (meta && !existing.external_source) {
+      Object.assign(update, {
+        cover_url: meta.cover_url || sug.cover_url || "",
+        total: meta.total ?? null, synopsis: meta.synopsis || "",
+        year: meta.year || "", country: meta.country || "",
+        external_id: meta.external_id ?? null, external_source: meta.external_source ?? null,
+      });
+    }
     unwrap(await supabase.from("titles").update(update).eq("id", existing.id).select("id").single());
     titleId = existing.id;
   } else {
     const row = unwrap(await supabase.from("titles").insert({
       user_id: userId, category_id: cat.id, title: sug.title, status: "watching",
-      progress: sug.episode || 0, season: sug.season ?? null, cover_url: sug.cover_url || "", source: "extension",
+      progress: sug.episode || 0, season: sug.season ?? null,
+      cover_url: meta?.cover_url || sug.cover_url || "",
+      total: meta?.total ?? null, synopsis: meta?.synopsis || "",
+      year: meta?.year || "", country: meta?.country || "",
+      external_id: meta?.external_id ?? null, external_source: meta?.external_source ?? null,
+      source: "extension",
     }).select("id").single());
     titleId = row.id;
   }
