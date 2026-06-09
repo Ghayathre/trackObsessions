@@ -1,0 +1,253 @@
+{
+  "project_name": "Hanabi Hobby Tracker",
+  "app_type": "hybrid_fullstack",
+  "theme_and_archetype": {
+    "domain": "Entertainment, Hobby, Fandom Tracker",
+    "theme": "DARK (Default) / User-Themable",
+    "archetype": "Archetype 3 (Pastel & Soft) mixed with Archetype 7 (Electric/Neon) for a Cozy yet Vibrant aesthetic",
+    "vibe": "Personal, cozy, animated, distinctive, non-corporate"
+  },
+  "typography": {
+    "fonts": {
+      "headings": {
+        "family": "Cabinet Grotesk, sans-serif",
+        "import_url": "https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@800,500,700,400,900&display=swap",
+        "usage": "H1, H2, H3, large stats, and media titles."
+      },
+      "body": {
+        "family": "Figtree, sans-serif",
+        "import_url": "https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap",
+        "usage": "Paragraphs, labels, tags, and small metadata."
+      }
+    },
+    "scale": {
+      "h1": "text-5xl sm:text-6xl tracking-tight font-black",
+      "h2": "text-3xl sm:text-4xl tracking-tight font-bold",
+      "h3": "text-xl sm:text-2xl font-bold",
+      "body": "text-base leading-relaxed",
+      "small": "text-sm text-muted-foreground uppercase tracking-[0.1em]"
+    }
+  },
+  "colors": {
+    "philosophy": "CSS variables define the entire palette. Default theme 'Tokyo Twilight' uses deep moody backgrounds with glowing pastel/neon accents to mimic late-night anime watching.",
+    "themes": {
+      "default_tokyo_twilight": {
+        "--background": "230 25% 10%",
+        "--foreground": "210 40% 98%",
+        "--card": "230 25% 14%",
+        "--card-foreground": "210 40% 98%",
+        "--popover": "230 25% 14%",
+        "--popover-foreground": "210 40% 98%",
+        "--primary": "340 80% 65%",
+        "--primary-foreground": "0 0% 100%",
+        "--secondary": "260 60% 60%",
+        "--secondary-foreground": "0 0% 100%",
+        "--muted": "230 20% 20%",
+        "--muted-foreground": "230 20% 70%",
+        "--accent": "190 80% 60%",
+        "--accent-foreground": "230 25% 10%",
+        "--destructive": "0 70% 50%",
+        "--destructive-foreground": "210 40% 98%",
+        "--border": "230 20% 20%",
+        "--input": "230 20% 20%",
+        "--ring": "340 80% 65%",
+        "--radius": "0.75rem"
+      },
+      "sakura_blossom": {
+        "--background": "340 30% 96%",
+        "--foreground": "340 40% 20%",
+        "--card": "0 0% 100%",
+        "--card-foreground": "340 40% 20%",
+        "--primary": "340 70% 65%",
+        "--primary-foreground": "0 0% 100%",
+        "--secondary": "330 40% 85%",
+        "--secondary-foreground": "340 40% 20%",
+        "--muted": "340 20% 90%",
+        "--muted-foreground": "340 20% 50%",
+        "--accent": "340 80% 80%",
+        "--accent-foreground": "340 40% 20%",
+        "--border": "340 20% 88%",
+        "--input": "340 20% 88%",
+        "--ring": "340 70% 65%"
+      },
+      "matcha_latte": {
+        "--background": "120 20% 95%",
+        "--foreground": "120 40% 20%",
+        "--card": "0 0% 100%",
+        "--card-foreground": "120 40% 20%",
+        "--primary": "140 40% 45%",
+        "--primary-foreground": "0 0% 100%",
+        "--secondary": "40 40% 85%",
+        "--secondary-foreground": "120 40% 20%",
+        "--muted": "120 20% 90%",
+        "--muted-foreground": "120 20% 50%",
+        "--accent": "80 40% 70%",
+        "--accent-foreground": "120 40% 20%",
+        "--border": "120 20% 88%",
+        "--input": "120 20% 88%",
+        "--ring": "140 40% 45%"
+      },
+      "midnight_cyber": {
+        "--background": "240 10% 4%",
+        "--foreground": "0 0% 100%",
+        "--card": "240 10% 8%",
+        "--card-foreground": "0 0% 100%",
+        "--primary": "60 100% 50%",
+        "--primary-foreground": "240 10% 4%",
+        "--secondary": "180 100% 50%",
+        "--secondary-foreground": "240 10% 4%",
+        "--muted": "240 10% 15%",
+        "--muted-foreground": "240 5% 60%",
+        "--accent": "300 100% 50%",
+        "--accent-foreground": "0 0% 100%",
+        "--border": "240 10% 20%",
+        "--input": "240 10% 20%",
+        "--ring": "60 100% 50%"
+      },
+      "retro_vaporwave": {
+        "--background": "280 40% 10%",
+        "--foreground": "320 80% 90%",
+        "--card": "280 40% 15%",
+        "--card-foreground": "320 80% 90%",
+        "--primary": "320 80% 60%",
+        "--primary-foreground": "0 0% 100%",
+        "--secondary": "190 80% 60%",
+        "--secondary-foreground": "0 0% 100%",
+        "--muted": "280 40% 25%",
+        "--muted-foreground": "320 40% 60%",
+        "--accent": "40 90% 60%",
+        "--accent-foreground": "280 40% 10%",
+        "--border": "280 40% 30%",
+        "--input": "280 40% 30%",
+        "--ring": "320 80% 60%"
+      },
+      "monochrome": {
+        "--background": "0 0% 100%",
+        "--foreground": "0 0% 0%",
+        "--card": "0 0% 98%",
+        "--card-foreground": "0 0% 0%",
+        "--primary": "0 0% 0%",
+        "--primary-foreground": "0 0% 100%",
+        "--secondary": "0 0% 90%",
+        "--secondary-foreground": "0 0% 0%",
+        "--muted": "0 0% 95%",
+        "--muted-foreground": "0 0% 40%",
+        "--accent": "0 0% 10%",
+        "--accent-foreground": "0 0% 100%",
+        "--border": "0 0% 90%",
+        "--input": "0 0% 90%",
+        "--ring": "0 0% 0%"
+      },
+      "dracula": {
+        "--background": "231 15% 18%",
+        "--foreground": "60 30% 96%",
+        "--card": "231 15% 22%",
+        "--card-foreground": "60 30% 96%",
+        "--primary": "326 100% 74%",
+        "--primary-foreground": "231 15% 18%",
+        "--secondary": "265 89% 78%",
+        "--secondary-foreground": "60 30% 96%",
+        "--muted": "231 15% 28%",
+        "--muted-foreground": "231 15% 60%",
+        "--accent": "135 94% 65%",
+        "--accent-foreground": "231 15% 18%",
+        "--border": "231 15% 28%",
+        "--input": "231 15% 28%",
+        "--ring": "326 100% 74%"
+      },
+      "status_colors": {
+        "watching": "hsl(var(--primary))",
+        "completed": "hsl(var(--accent))",
+        "plan_to_watch": "hsl(var(--secondary))",
+        "dropped": "hsl(var(--destructive))",
+        "on_hold": "hsl(var(--muted-foreground))"
+      }
+    }
+  },
+  "layout_and_spacing": {
+    "philosophy": "Generous spacing. Asymmetric grids. Sidebar navigation.",
+    "sidebar": "Fixed left sidebar (`w-64` or `w-72`) on desktop, hidden on mobile behind a hamburger menu. Must contain navigation links, user profile snippet, and Hanabi extension connection status.",
+    "main_content": "Margin-left to accommodate sidebar on desktop. Wrap inside a `p-6 md:p-12` container for breathing room.",
+    "grids": {
+      "media_gallery": "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6",
+      "stats_bento": "grid-cols-1 md:grid-cols-4 gap-6 (Mode B 'Control Room' grid rules applied for sleek stats)"
+    },
+    "containers": "All surfaces must have nested radii. If card is `rounded-xl`, internal image is `rounded-lg`. Elements that have backgrounds must have internal padding (`p-4` or `p-6`)."
+  },
+  "components": {
+    "icons": {
+      "library": "lucide-react",
+      "instruction": "Use Lucide icons for all UI elements. NO EMOJIS for UI functionality."
+    },
+    "media_card": {
+      "type": "Custom HTML/Tailwind",
+      "design": "Flat, rectangular poster aspect ratio (2:3). Image takes up 100% of card. Title and episode info appear as an overlay on hover using a dark gradient scrim at the bottom (`bg-gradient-to-t from-black/80 to-transparent`). Badge at top-right for rating or status.",
+      "interaction": "Hover: Slight scale up (`hover:scale-105`), smooth transition (`transition-transform duration-300`). Image brightens."
+    },
+    "hanabi_inbox": {
+      "type": "Shadcn Sheet or Floating Panel",
+      "design": "Glassmorphism (`backdrop-blur-xl bg-background/80`). 1px inner border. Should slide in or float to notify the user of detected media.",
+      "glow": "Use a subtle box-shadow utilizing the primary color variable to signify it's active."
+    },
+    "theme_picker": {
+      "type": "Grid of swatches",
+      "design": "Settings page should show a bento grid of theme options. Each option is a small card previewing the primary, secondary, and background colors. Selected theme gets a `ring-2 ring-primary ring-offset-2 ring-offset-background`."
+    },
+    "status_badge": {
+      "type": "Custom Badge",
+      "design": "Pill-shaped (`rounded-full`), small font (`text-xs uppercase tracking-wider`). Background is a 10% opacity tint of the status color, text is the solid status color."
+    }
+  },
+  "motion_and_interactions": {
+    "page_transitions": "Framer Motion for soft fade and slight slide-up (`initial={{ opacity: 0, y: 10 }}`) on route changes or tab switching.",
+    "staggered_lists": "Media gallery items must use stagger reveals. Do not just load 20 cards at once; let them cascade in.",
+    "theme_transition": "Apply `transition-colors duration-500` to the `body` tag so switching themes is a fluid, magical experience, not an abrupt flash."
+  },
+  "testing_and_accessibility": {
+    "data_testid_rules": "All interactive elements MUST include `data-testid`.",
+    "examples": [
+      "data-testid='nav-category-anime'",
+      "data-testid='media-card-weak-hero'",
+      "data-testid='hanabi-accept-suggestion'",
+      "data-testid='theme-picker-sakura'",
+      "data-testid='update-episode-btn'"
+    ],
+    "contrast": "Text over posters must have sufficient text-shadow or a gradient overlay underneath to pass APCA contrast checks."
+  },
+  "media_assets": {
+    "instructions_to_main_agent": "Use these precise URLs for mock data, backgrounds, and empty states. DO NOT use generic placeholder services.",
+    "backgrounds": [
+      {
+        "url": "https://images.unsplash.com/photo-1694276971921-ff8f103752eb?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzd8MHwxfHNlYXJjaHw0fHxhbmltZSUyMGFlc3RoZXRpYyUyMGJhY2tncm91bmR8ZW58MHx8fHwxNzgwOTkyMTU5fDA&ixlib=rb-4.1.0&q=85",
+        "description": "Narrow city alley at night - Good for Tokyo Twilight theme background"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1548317202-26d94742e8d8?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2Mzl8MHwxfHNlYXJjaHw0fHxuZW9uJTIwY3liZXJwdW5rJTIwc3RyZWV0JTIwbmlnaHR8ZW58MHx8fHwxNzgwOTkyMTU5fDA&ixlib=rb-4.1.0&q=85",
+        "description": "Wet cyberpunk street - Good for auth page or cyberpunk theme"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1772211148356-b06ab210c7be?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1MDZ8MHwxfHNlYXJjaHwzfHxjb3p5JTIwcmVhZGluZyUyMG1hbmdhJTIwY2FmZXxlbnwwfHx8fDE3ODA5OTIxNTl8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Anime themed interior - Good for Matcha/Cozy theme"
+      }
+    ],
+    "posters_mock_data": [
+      {
+        "url": "https://images.unsplash.com/photo-1587930734782-4fe289d9ea8f?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzd8MHwxfHNlYXJjaHwyfHxhbmltZSUyMGFlc3RoZXRpYyUyMGJhY2tncm91bmR8ZW58MHx8fHwxNzgwOTkyMTU5fDA&ixlib=rb-4.1.0&q=85",
+        "title": "Mock Poster 1"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1601042879364-f3947d3f9c16?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2Mzl8MHwxfHNlYXJjaHwxfHxuZW9uJTIwY3liZXJwdW5rJTIwc3RyZWV0JTIwbmlnaHR8ZW58MHx8fHwxNzgwOTkyMTU5fDA&ixlib=rb-4.1.0&q=85",
+        "title": "Mock Poster 2"
+      }
+    ]
+  },
+  "implementation_checklist": [
+    "1. Setup font imports for Cabinet Grotesk and Figtree in index.css",
+    "2. Setup CSS variables in index.css for the themes. Use a class-based approach (e.g., .theme-sakura, .theme-dracula) on the html/body tag.",
+    "3. Implement the Layout with Sidebar and main content area.",
+    "4. Build the Media Card component with hover overlays.",
+    "5. Build the Theme Picker bento grid.",
+    "6. Build the Hanabi inbox/notification slide-over.",
+    "7. Ensure all interactive elements have data-testid."
+  ]
+}
