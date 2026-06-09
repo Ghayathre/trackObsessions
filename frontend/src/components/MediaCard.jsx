@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card } from "./ui/card";
 import { Star, Plus, Minus, Trash2 } from "lucide-react";
 import api from "../lib/api";
@@ -29,6 +29,10 @@ const STATUS_COLOR = {
 export default function MediaCard({ item, onChange, kind = "video" }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(item);
+  const [coverFailed, setCoverFailed] = useState(false);
+
+  // reset cover failure when item changes
+  useEffect(() => { setCoverFailed(false); }, [item.cover_url]);
 
   const inc = async (delta) => {
     const next = Math.max(0, (item.progress || 0) + delta);
@@ -69,8 +73,14 @@ export default function MediaCard({ item, onChange, kind = "video" }) {
         className="group relative overflow-hidden cursor-pointer border-border bg-card aspect-[2/3] hover:scale-[1.03] transition-transform duration-300 fade-up"
         data-testid={`media-card-${item.id}`}
       >
-        {item.cover_url ? (
-          <img src={item.cover_url} alt={item.title} className="absolute inset-0 w-full h-full object-cover transition-all group-hover:brightness-110" />
+        {item.cover_url && !coverFailed ? (
+          <img
+            src={item.cover_url}
+            alt={item.title}
+            referrerPolicy="no-referrer"
+            onError={() => setCoverFailed(true)}
+            className="absolute inset-0 w-full h-full object-cover transition-all group-hover:brightness-110"
+          />
         ) : (
           <div className="absolute inset-0 bg-gradient-to-br from-muted to-card grid place-items-center p-4 text-center">
             <span className="font-display font-bold text-lg leading-tight">{item.title}</span>

@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import api from "../lib/api";
 import MediaCard from "../components/MediaCard";
 import AddTitleDialog from "../components/AddTitleDialog";
+import CategoryLinks from "../components/CategoryLinks";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
 import { Search, Share2 } from "lucide-react";
@@ -114,6 +115,8 @@ export default function Category() {
           ))}
         </div>
       )}
+
+      {cat && <CategoryLinks categoryId={cat.id} />}
     </div>
   );
 }

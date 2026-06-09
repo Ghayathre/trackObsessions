@@ -395,7 +395,64 @@ async def delete_category(cat_id: str, user=Depends(get_current_user)):
     if not cat:
         raise HTTPException(status_code=404, detail="Category not found")
     await db.titles.delete_many({"user_id": user["_id"], "category_id": _id})
+    await db.category_links.delete_many({"user_id": user["_id"], "category_id": _id})
     await db.categories.delete_one({"_id": _id})
+    return {"ok": True}
+
+
+# ---------- Category links (per-collection bookmarks) ----------
+@api.get("/categories/{cat_id}/links")
+async def list_category_links(cat_id: str, user=Depends(get_current_user)):
+    _id = oid(cat_id)
+    if not await db.categories.find_one({"_id": _id, "user_id": user["_id"]}):
+        raise HTTPException(status_code=404, detail="Category not found")
+    links = await db.category_links.find(
+        {"user_id": user["_id"], "category_id": _id}
+    ).sort("created_at", 1).to_list(200)
+    out = []
+    for l in links:
+        d = serialize(l)
+        d["category_id"] = str(l["category_id"])
+        out.append(d)
+    return out
+
+@api.post("/categories/{cat_id}/links")
+async def create_category_link(cat_id: str, payload: dict, user=Depends(get_current_user)):
+    _id = oid(cat_id)
+    if not await db.categories.find_one({"_id": _id, "user_id": user["_id"]}):
+        raise HTTPException(status_code=404, detail="Category not found")
+    url = (payload or {}).get("url", "").strip()
+    label = (payload or {}).get("label", "").strip()
+    if not url:
+        raise HTTPException(status_code=400, detail="url is required")
+    # normalize URL (add https:// if missing)
+    if not re.match(r"^https?://", url, flags=re.I):
+        url = "https://" + url
+    if not label:
+        # derive label from host
+        m = re.match(r"^https?://([^/]+)", url, flags=re.I)
+        label = (m.group(1) if m else url)[:60]
+    doc = {
+        "user_id": user["_id"],
+        "category_id": _id,
+        "label": label[:120],
+        "url": url[:2000],
+        "created_at": now_iso(),
+    }
+    res = await db.category_links.insert_one(doc)
+    out = serialize({**doc, "_id": res.inserted_id})
+    out["category_id"] = str(_id)
+    return out
+
+@api.delete("/categories/{cat_id}/links/{link_id}")
+async def delete_category_link(cat_id: str, link_id: str, user=Depends(get_current_user)):
+    res = await db.category_links.delete_one({
+        "_id": oid(link_id),
+        "category_id": oid(cat_id),
+        "user_id": user["_id"],
+    })
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Link not found")
     return {"ok": True}
 
 
@@ -1019,6 +1076,7 @@ async def startup():
     await db.suggestions.create_index([("user_id", 1), ("status", 1)])
     await db.api_keys.create_index("key_hash")
     await db.activity.create_index([("user_id", 1), ("created_at", -1)])
+    await db.category_links.create_index([("user_id", 1), ("category_id", 1)])
 
     # Backfill username for any user missing it (one-shot)
     async for u in db.users.find({"$or": [{"username": {"$exists": False}}, {"username": None}]}):

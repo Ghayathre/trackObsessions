@@ -32,6 +32,7 @@ const SOURCES = [
 export default function AddTitleDialog({ categoryId, categoryKind = "video", categorySlug = "", onAdded, triggerLabel = "Add title" }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
+  const [selectedExtId, setSelectedExtId] = useState(null);
   const [source, setSource] = useState(defaultSourceFor(categorySlug, categoryKind));
   const [status, setStatus] = useState("watching");
   const [progress, setProgress] = useState(0);
@@ -47,6 +48,7 @@ export default function AddTitleDialog({ categoryId, categoryKind = "video", cat
     if (!open) {
       setTitle(""); setProgress(0); setSeason(""); setCoverUrl("");
       setResults([]); setStatus("watching"); setTouchedCover(false);
+      setSelectedExtId(null);
       setSource(defaultSourceFor(categorySlug, categoryKind));
     }
   }, [open, categorySlug, categoryKind]);
@@ -73,6 +75,7 @@ export default function AddTitleDialog({ categoryId, categoryKind = "video", cat
 
   const pick = (r) => {
     setTitle(r.title);
+    setSelectedExtId(r.external_id || null);
     if (!touchedCover) setCoverUrl(r.cover_url || "");
   };
 
@@ -150,7 +153,7 @@ export default function AddTitleDialog({ categoryId, categoryKind = "video", cat
                     onClick={() => pick(r)}
                     data-testid={`result-${i}`}
                     className={`text-left rounded-md overflow-hidden border transition group ${
-                      title.trim().toLowerCase() === (r.title || "").toLowerCase() ? "border-primary ring-2 ring-primary/30" : "border-border hover:border-primary/60"
+                      r.external_id && r.external_id === selectedExtId ? "border-primary ring-2 ring-primary/30" : "border-border hover:border-primary/60"
                     }`}
                   >
                     {r.cover_url ? (
