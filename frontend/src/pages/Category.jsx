@@ -77,7 +77,7 @@ export default function Category() {
               <Share2 className="w-3.5 h-3.5 mr-1" /> Share
             </Button>
           )}
-          {cat && <AddTitleDialog categoryId={cat.id} categoryKind={kind} onAdded={() => load()} />}
+          {cat && <AddTitleDialog categoryId={cat.id} categoryKind={kind} categorySlug={cat.slug} onAdded={() => load()} />}
         </div>
       </header>
 

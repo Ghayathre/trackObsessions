@@ -560,12 +560,22 @@ async def activity(user=Depends(get_current_user), limit: int = 50):
 
 
 # ---------- Metadata search ----------
+def _strip_html(s: str) -> str:
+    if not s:
+        return ""
+    return re.sub(r"<[^>]+>", "", s)
+
 @api.get("/metadata/search")
 async def metadata_search(
     q: str = Query(..., min_length=1),
-    kind: str = Query("anime"),  # anime | manga | books | drama
+    kind: str = Query("anime"),  # anime | manga | tv | books
     _user=Depends(get_current_user),
 ):
+    """Search third-party catalogues for a title.
+    - anime/manga: Jikan (MyAnimeList)
+    - tv: TVmaze (k-dramas, Thai BLs, c-dramas, western TV)
+    - books: Open Library
+    """
     try:
         async with httpx.AsyncClient(timeout=8.0) as cli:
             if kind in ("anime", "manga"):
@@ -579,9 +589,28 @@ async def metadata_search(
                         "external_id": str(d.get("mal_id")),
                         "total": d.get("episodes") if kind == "anime" else d.get("chapters"),
                         "synopsis": d.get("synopsis"),
+                        "source": "jikan",
                     }
                     for d in data
                 ]
+            elif kind == "tv":
+                r = await cli.get("https://api.tvmaze.com/search/shows", params={"q": q})
+                arr = r.json() or []
+                out = []
+                for row in arr[:12]:
+                    s = row.get("show") or {}
+                    img = s.get("image") or {}
+                    out.append({
+                        "title": s.get("name"),
+                        "cover_url": img.get("original") or img.get("medium") or "",
+                        "external_id": f"tvmaze-{s.get('id')}",
+                        "total": s.get("runtime"),  # minutes per ep — informational
+                        "synopsis": _strip_html(s.get("summary") or ""),
+                        "year": (s.get("premiered") or "")[:4],
+                        "country": ((s.get("network") or {}).get("country") or {}).get("name"),
+                        "source": "tvmaze",
+                    })
+                return out
             elif kind == "books":
                 r = await cli.get("https://openlibrary.org/search.json", params={"q": q, "limit": 8})
                 docs = r.json().get("docs", [])
@@ -595,11 +624,12 @@ async def metadata_search(
                         "external_id": d.get("key", ""),
                         "total": d.get("number_of_pages_median"),
                         "synopsis": (d.get("author_name") or [""])[0],
+                        "source": "openlibrary",
                     })
                 return out
-            else:  # drama / kdrama / generic — Jikan won't help; fall through
+            else:
                 return []
-    except Exception as e:
+    except Exception:
         logging.exception("metadata search failed")
         return []
 
