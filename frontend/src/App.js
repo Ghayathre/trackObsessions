@@ -8,6 +8,7 @@ import Register from "@/pages/Register";
 import Dashboard from "@/pages/Dashboard";
 import Category from "@/pages/Category";
 import Settings from "@/pages/Settings";
+import PublicProfile from "@/pages/PublicProfile";
 import Layout from "@/components/Layout";
 
 function Protected({ children }) {
@@ -32,6 +33,7 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<PublicOnly><Login /></PublicOnly>} />
             <Route path="/register" element={<PublicOnly><Register /></PublicOnly>} />
+            <Route path="/u/:username" element={<PublicProfile />} />
             <Route path="/" element={<Protected><Dashboard /></Protected>} />
             <Route path="/c/:id" element={<Protected><Category /></Protected>} />
             <Route path="/settings" element={<Protected><Settings /></Protected>} />

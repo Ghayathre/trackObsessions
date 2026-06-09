@@ -60,6 +60,22 @@ def create_access_token(user_id: str, email: str) -> str:
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
+import re
+def slugify_username(base: str) -> str:
+    s = re.sub(r"[^a-z0-9_-]+", "-", (base or "").lower()).strip("-_")
+    return s[:30] or "user"
+
+async def unique_username(base: str) -> str:
+    candidate = slugify_username(base)
+    if not await db.users.find_one({"username": candidate}):
+        return candidate
+    i = 2
+    while True:
+        c = f"{candidate}-{i}"
+        if not await db.users.find_one({"username": c}):
+            return c
+        i += 1
+
 def oid(s: str) -> ObjectId:
     try:
         return ObjectId(s)
@@ -120,6 +136,12 @@ class TitleUpdate(BaseModel):
 
 class ThemeIn(BaseModel):
     theme: str
+
+class SettingsIn(BaseModel):
+    auto_accept: Optional[bool] = None
+    profile_public: Optional[bool] = None
+    name: Optional[str] = None
+    username: Optional[str] = None
 
 class SuggestionIn(BaseModel):
     title: str
@@ -186,11 +208,15 @@ async def register(payload: RegisterIn, response: Response):
     email = payload.email.lower().strip()
     if await db.users.find_one({"email": email}):
         raise HTTPException(status_code=400, detail="Email already registered")
+    username = await unique_username(payload.name or email.split("@")[0])
     doc = {
         "email": email,
+        "username": username,
         "name": payload.name or email.split("@")[0],
         "password_hash": hash_password(payload.password),
         "theme": "tokyo-twilight",
+        "auto_accept": False,
+        "profile_public": False,
         "created_at": now_iso(),
     }
     res = await db.users.insert_one(doc)
@@ -230,6 +256,29 @@ async def me(user=Depends(get_current_user)):
 async def set_theme(payload: ThemeIn, user=Depends(get_current_user)):
     await db.users.update_one({"_id": user["_id"]}, {"$set": {"theme": payload.theme}})
     return {"ok": True, "theme": payload.theme}
+
+@api.patch("/auth/settings")
+async def update_settings(payload: SettingsIn, user=Depends(get_current_user)):
+    update: dict = {}
+    if payload.auto_accept is not None:
+        update["auto_accept"] = bool(payload.auto_accept)
+    if payload.profile_public is not None:
+        update["profile_public"] = bool(payload.profile_public)
+    if payload.name is not None and payload.name.strip():
+        update["name"] = payload.name.strip()[:60]
+    if payload.username is not None:
+        new_u = slugify_username(payload.username)
+        if not new_u:
+            raise HTTPException(status_code=400, detail="Invalid username")
+        existing = await db.users.find_one({"username": new_u, "_id": {"$ne": user["_id"]}})
+        if existing:
+            raise HTTPException(status_code=400, detail="Username already taken")
+        update["username"] = new_u
+    if not update:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    await db.users.update_one({"_id": user["_id"]}, {"$set": update})
+    fresh = await db.users.find_one({"_id": user["_id"]})
+    return serialize(fresh)
 
 
 # ---------- Categories ----------
@@ -584,28 +633,127 @@ async def extension_scan(payload: SuggestionIn, user=Depends(get_user_by_api_key
         "updated_at": now_iso(),
     }
     res = await db.suggestions.insert_one(doc)
-    return {"ok": True, "suggestion_id": str(res.inserted_id)}
+    suggestion_id = str(res.inserted_id)
+
+    # Auto-accept policy: if user has enabled it AND we resolved a category,
+    # convert this suggestion straight into a title.
+    if user.get("auto_accept") and cat_slug:
+        cat = await db.categories.find_one({"user_id": user["_id"], "slug": cat_slug})
+        if cat:
+            existing_title = await db.titles.find_one({
+                "user_id": user["_id"],
+                "category_id": cat["_id"],
+                "title": {"$regex": f"^{re.escape(payload.title)}$", "$options": "i"},
+            })
+            if existing_title:
+                t_update = {"updated_at": now_iso(), "source": "extension"}
+                if payload.episode is not None:
+                    t_update["progress"] = max(existing_title.get("progress") or 0, payload.episode)
+                if payload.season is not None:
+                    t_update["season"] = payload.season
+                await db.titles.update_one({"_id": existing_title["_id"]}, {"$set": t_update})
+                title_id = str(existing_title["_id"])
+            else:
+                t_doc = {
+                    "user_id": user["_id"],
+                    "category_id": cat["_id"],
+                    "title": payload.title,
+                    "status": "watching",
+                    "progress": payload.episode or 0,
+                    "season": payload.season,
+                    "cover_url": payload.cover_url or "",
+                    "source": "extension",
+                    "created_at": now_iso(),
+                    "updated_at": now_iso(),
+                }
+                tr = await db.titles.insert_one(t_doc)
+                title_id = str(tr.inserted_id)
+            await db.suggestions.update_one(
+                {"_id": res.inserted_id},
+                {"$set": {"status": "accepted", "title_id": title_id, "auto_accepted": True}},
+            )
+            return {"ok": True, "suggestion_id": suggestion_id, "auto_accepted": True, "title_id": title_id}
+
+    return {"ok": True, "suggestion_id": suggestion_id}
+
+
+# ---------- Public profile (no auth) ----------
+async def _public_user_or_404(username: str) -> dict:
+    u = await db.users.find_one({"username": username})
+    if not u:
+        raise HTTPException(status_code=404, detail="User not found")
+    if not u.get("profile_public"):
+        raise HTTPException(status_code=404, detail="Profile is private")
+    return u
+
+@api.get("/public/u/{username}")
+async def public_profile(username: str):
+    u = await _public_user_or_404(username)
+    cats = await db.categories.find({"user_id": u["_id"]}).sort("created_at", 1).to_list(500)
+    cats_out = []
+    for c in cats:
+        count = await db.titles.count_documents({"user_id": u["_id"], "category_id": c["_id"]})
+        cats_out.append({**serialize(c), "count": count})
+    total = await db.titles.count_documents({"user_id": u["_id"]})
+    return {
+        "user": {
+            "username": u.get("username"),
+            "name": u.get("name"),
+            "theme": u.get("theme") or "tokyo-twilight",
+            "created_at": u.get("created_at"),
+        },
+        "categories": cats_out,
+        "total": total,
+    }
+
+@api.get("/public/u/{username}/titles")
+async def public_titles(username: str, category_id: Optional[str] = None, status: Optional[str] = None):
+    u = await _public_user_or_404(username)
+    q: dict = {"user_id": u["_id"]}
+    if category_id:
+        q["category_id"] = oid(category_id)
+    if status:
+        q["status"] = status
+    items = await db.titles.find(q).sort("updated_at", -1).limit(500).to_list(500)
+    out = []
+    for t in items:
+        d = serialize(t)
+        d["category_id"] = str(t["category_id"])
+        # strip private fields
+        d.pop("notes", None)
+        out.append(d)
+    return out
 
 
 # ---------- Startup ----------
 @app.on_event("startup")
 async def startup():
     await db.users.create_index("email", unique=True)
+    await db.users.create_index("username", unique=True, sparse=True)
     await db.categories.create_index([("user_id", 1), ("slug", 1)])
     await db.titles.create_index([("user_id", 1), ("category_id", 1)])
     await db.suggestions.create_index([("user_id", 1), ("status", 1)])
     await db.api_keys.create_index("key_hash")
+
+    # Backfill username for any user missing it (one-shot)
+    async for u in db.users.find({"$or": [{"username": {"$exists": False}}, {"username": None}]}):
+        new_u = await unique_username(u.get("name") or u.get("email", "").split("@")[0])
+        await db.users.update_one({"_id": u["_id"]}, {"$set": {"username": new_u}})
 
     # seed admin
     admin_email = os.environ.get("ADMIN_EMAIL", "admin@hanabi.app")
     admin_password = os.environ.get("ADMIN_PASSWORD", "hanabi123")
     existing = await db.users.find_one({"email": admin_email})
     if not existing:
+        admin_username = await unique_username("admin")
         res = await db.users.insert_one({
             "email": admin_email,
+            "username": admin_username,
             "name": "Admin",
             "password_hash": hash_password(admin_password),
             "theme": "tokyo-twilight",
+            "auto_accept": False,
+            "profile_public": False,
             "created_at": now_iso(),
         })
         cats = [

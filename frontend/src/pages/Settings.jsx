@@ -5,21 +5,28 @@ import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import { Copy, Trash2, KeyRound, ShieldAlert } from "lucide-react";
+import { Switch } from "../components/ui/switch";
+import { Copy, Trash2, KeyRound, ShieldAlert, User, Share2, ExternalLink, Sparkles } from "lucide-react";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
 
 export default function Settings() {
-  const { user } = useAuth();
+  const { user, refresh } = useAuth();
   const [keys, setKeys] = useState([]);
   const [label, setLabel] = useState("Hanabi extension");
-  const [revealed, setRevealed] = useState(null); // freshly-created key shown once
+  const [revealed, setRevealed] = useState(null);
+  const [profileDraft, setProfileDraft] = useState({ name: "", username: "" });
+  const [savingProfile, setSavingProfile] = useState(false);
 
   const load = async () => {
     const { data } = await api.get("/api-keys");
     setKeys(data);
   };
   useEffect(() => { load(); }, []);
+  useEffect(() => {
+    if (user) setProfileDraft({ name: user.name || "", username: user.username || "" });
+  }, [user]);
 
   const create = async () => {
     const { data } = await api.post("/api-keys", { label });
@@ -40,7 +47,25 @@ export default function Settings() {
     toast.success("Copied");
   };
 
+  const updateSettings = async (patch, successMsg) => {
+    try {
+      await api.patch("/auth/settings", patch);
+      await refresh();
+      if (successMsg) toast.success(successMsg);
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      toast.error(typeof detail === "string" ? detail : "Could not save");
+    }
+  };
+
+  const saveProfile = async () => {
+    setSavingProfile(true);
+    await updateSettings({ name: profileDraft.name, username: profileDraft.username }, "Profile saved");
+    setSavingProfile(false);
+  };
+
   const apiBase = `${process.env.REACT_APP_BACKEND_URL}/api`;
+  const publicUrl = user?.username ? `${window.location.origin}/u/${user.username}` : "";
 
   return (
     <div className="space-y-12">
@@ -50,12 +75,85 @@ export default function Settings() {
         <p className="text-muted-foreground mt-1">Signed in as {user?.email}</p>
       </header>
 
+      {/* Profile */}
+      <section>
+        <h2 className="font-display font-bold text-2xl mb-3 flex items-center gap-2"><User className="w-5 h-5" /> Profile</h2>
+        <Card className="p-5 space-y-4">
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="display-name">Display name</Label>
+              <Input id="display-name" value={profileDraft.name} onChange={(e) => setProfileDraft({ ...profileDraft, name: e.target.value })} data-testid="settings-name" />
+            </div>
+            <div>
+              <Label htmlFor="username">Username</Label>
+              <Input id="username" value={profileDraft.username} onChange={(e) => setProfileDraft({ ...profileDraft, username: e.target.value })} data-testid="settings-username" />
+              <div className="text-[11px] text-muted-foreground mt-1">Used in your public link.</div>
+            </div>
+          </div>
+          <Button onClick={saveProfile} disabled={savingProfile} data-testid="save-profile">Save profile</Button>
+        </Card>
+      </section>
+
+      {/* Sharing */}
+      <section>
+        <h2 className="font-display font-bold text-2xl mb-3 flex items-center gap-2"><Share2 className="w-5 h-5" /> Share your library</h2>
+        <Card className="p-5">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="flex-1 min-w-[200px]">
+              <div className="font-medium">Public profile</div>
+              <p className="text-sm text-muted-foreground mt-1">
+                When ON, anyone with the link can see your collections (notes stay private).
+              </p>
+            </div>
+            <Switch
+              checked={!!user?.profile_public}
+              onCheckedChange={(v) => updateSettings({ profile_public: v }, v ? "Profile is now public" : "Profile is now private")}
+              data-testid="toggle-public"
+            />
+          </div>
+          {user?.profile_public && (
+            <div className="mt-5 pt-5 border-t border-border">
+              <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Your public link</div>
+              <div className="flex items-center gap-2">
+                <code className="text-xs sm:text-sm bg-muted px-3 py-2 rounded-md flex-1 overflow-x-auto whitespace-nowrap" data-testid="public-link">{publicUrl}</code>
+                <Button variant="outline" size="sm" onClick={() => copy(publicUrl)} data-testid="copy-public-link"><Copy className="w-3.5 h-3.5" /></Button>
+                <Link to={`/u/${user.username}`} target="_blank">
+                  <Button size="sm" variant="outline"><ExternalLink className="w-3.5 h-3.5" /></Button>
+                </Link>
+              </div>
+            </div>
+          )}
+        </Card>
+      </section>
+
+      {/* Auto-accept */}
+      <section>
+        <h2 className="font-display font-bold text-2xl mb-3 flex items-center gap-2"><Sparkles className="w-5 h-5" /> Hanabi auto-pilot</h2>
+        <Card className="p-5">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="flex-1 min-w-[200px]">
+              <div className="font-medium">Auto-accept extension scans</div>
+              <p className="text-sm text-muted-foreground mt-1">
+                When ON and the extension confidently classifies a title (e.g. anime, k-drama), Hanabi adds it straight to your collection instead of asking. You'll still see it in the inbox as "auto-accepted".
+              </p>
+            </div>
+            <Switch
+              checked={!!user?.auto_accept}
+              onCheckedChange={(v) => updateSettings({ auto_accept: v }, v ? "Auto-pilot is on" : "Auto-pilot is off")}
+              data-testid="toggle-autoaccept"
+            />
+          </div>
+        </Card>
+      </section>
+
+      {/* Themes */}
       <section>
         <h2 className="font-display font-bold text-2xl mb-3">Themes</h2>
-        <p className="text-sm text-muted-foreground mb-5 max-w-2xl">Pick a vibe. Your choice syncs across devices. All shadcn surfaces re-skin instantly.</p>
+        <p className="text-sm text-muted-foreground mb-5 max-w-2xl">Pick a vibe. Your choice syncs across devices.</p>
         <ThemePicker />
       </section>
 
+      {/* API keys */}
       <section>
         <h2 className="font-display font-bold text-2xl mb-3 flex items-center gap-2"><KeyRound className="w-5 h-5" /> Hanabi extension keys</h2>
         <p className="text-sm text-muted-foreground mb-5 max-w-2xl">
