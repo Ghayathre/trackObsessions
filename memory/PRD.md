@@ -34,6 +34,10 @@
 - **Auto-accept policy**: per-user `auto_accept` toggle; when ON + extension provides a resolvable `category_hint`, `/api/extension/scan` adds/updates the title immediately (Suggestion is still recorded as `accepted` for audit).
 - `username` field added (unique, slugified, auto on register, editable in Settings); Settings page redesigned with Profile / Sharing / Auto-pilot sections.
 
+## v1.2 (2026-02, iteration 3)
+- **Activity timeline**: per-user `activity` log with 6 event types (add, progress, status, complete, remove, extension_add). New `GET /api/activity` endpoint. New `/activity` page + sidebar nav link. Compact 6-item recent-activity card on Dashboard.
+- **Hours-watched stats**: `minutes_per_unit` on categories (kdramas=60, anime=24, thai-bl=45, manga=8, books=3, custom=20). `GET /api/stats` now returns `hours`, `minutes`, and `by_category` breakdown. Dashboard gets a gradient "Hours logged" tile + "Hours by collection" bar chart.
+
 ## Backlog
 ### P1
 - OAuth/Google sign-in (in addition to email/password)
