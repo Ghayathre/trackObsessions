@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { updateProfile } from "../lib/db";
 import { THEMES } from "../data/themes";
 import { STYLES, DEFAULT_STYLE } from "../data/styles";
-import { MOTIONS, DEFAULT_MOTION, getMotionTokens, REDUCED_TOKENS } from "../data/motion";
+import { MOTIONS, DEFAULT_MOTION, getMotionTokens, REDUCED_TOKENS, COMPANIONS, DEFAULT_COMPANION, DEFAULT_CREATURES } from "../data/motion";
 import { useAuth } from "./AuthContext";
 
 const ThemeContext = createContext(null);
@@ -17,6 +17,16 @@ export function ThemeProvider({ children }) {
   // Motion is a device preference — persisted locally, not synced to the profile,
   // so it needs no DB column.
   const [motion, setMotionState] = useState(() => localStorage.getItem("hanabi_motion") || DEFAULT_MOTION);
+  const [companion, setCompanionState] = useState(() => localStorage.getItem("hanabi_companion") || DEFAULT_COMPANION);
+  const [creatures, setCreaturesState] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("hanabi_creatures") || "{}");
+      return {
+        soot: { ...DEFAULT_CREATURES.soot, ...(saved.soot || {}) },
+        firefly: { ...DEFAULT_CREATURES.firefly, ...(saved.firefly || {}) },
+      };
+    } catch { return DEFAULT_CREATURES; }
+  });
 
   // Track OS-level reduced-motion so we can override the chosen preset for accessibility.
   const [reduced, setReduced] = useState(
@@ -73,6 +83,19 @@ export function ThemeProvider({ children }) {
     localStorage.setItem("hanabi_motion", slug);
   };
 
+  const setCompanion = (slug) => {
+    setCompanionState(slug);
+    localStorage.setItem("hanabi_companion", slug);
+  };
+
+  const setCreatureSetting = (creature, key, val) => {
+    setCreaturesState((prev) => {
+      const next = { ...prev, [creature]: { ...prev[creature], [key]: val } };
+      localStorage.setItem("hanabi_creatures", JSON.stringify(next));
+      return next;
+    });
+  };
+
   // Resolved JS tokens for framer-motion primitives. Reduced-motion wins.
   const motionTokens = useMemo(
     () => (reduced ? REDUCED_TOKENS : getMotionTokens(motion)),
@@ -80,9 +103,9 @@ export function ThemeProvider({ children }) {
   );
 
   const value = {
-    theme, style, motion, reducedMotion: reduced,
-    setTheme, setStyle, setMotion,
-    themes: THEMES, styles: STYLES, motions: MOTIONS,
+    theme, style, motion, companion, creatures, reducedMotion: reduced,
+    setTheme, setStyle, setMotion, setCompanion, setCreatureSetting,
+    themes: THEMES, styles: STYLES, motions: MOTIONS, companions: COMPANIONS,
     motionTokens,
   };
 
@@ -98,5 +121,5 @@ export const useTheme = () => useContext(ThemeContext);
 // Convenience hook for motion-aware components: resolved tokens + the active preset.
 export const useMotion = () => {
   const ctx = useContext(ThemeContext);
-  return { tokens: ctx.motionTokens, motion: ctx.motion, reducedMotion: ctx.reducedMotion };
+  return { tokens: ctx.motionTokens, motion: ctx.motion, reducedMotion: ctx.reducedMotion, creatures: ctx.creatures };
 };

@@ -2,7 +2,7 @@
 // A motion preset controls how things move: entrance feel, stagger, hover physics,
 // page transitions, scroll parallax, and the ambient background. Selected like a theme;
 // applied as a `motion-<slug>` class on <html> and consumed as JS tokens by lib/motion.
-import { Orbit, Feather, Gauge } from "lucide-react";
+import { Orbit, Feather, Gauge, Bug, Sparkles, CircleOff } from "lucide-react";
 
 // Token shape consumed by lib/motion.js primitives. Every preset defines all keys so
 // callers never have to null-check.
@@ -32,8 +32,8 @@ export const MOTION_TOKENS = {
     // ambient drifting background + idle float utilities
     ambient: true,
     float: true,
-    // ambient confetti field that scatters from the cursor (0 = off)
-    fireflies: 320,
+    // soot-sprite creatures that scatter from the cursor (0 = off)
+    sprites: 30,
   },
   calm: {
     revealY: 24,
@@ -53,7 +53,7 @@ export const MOTION_TOKENS = {
     parallax: 0.55,
     ambient: true,
     float: false,
-    fireflies: 170,
+    sprites: 16,
   },
   minimal: {
     revealY: 10,
@@ -73,7 +73,7 @@ export const MOTION_TOKENS = {
     parallax: 0,
     ambient: false,
     float: false,
-    fireflies: 0,
+    sprites: 0,
   },
 };
 
@@ -125,3 +125,31 @@ export const DEFAULT_MOTION = "antigravity";
 export function getMotionTokens(slug) {
   return MOTION_TOKENS[slug] || MOTION_TOKENS[DEFAULT_MOTION];
 }
+
+// The little creatures that inhabit the page (density still comes from the motion preset).
+export const COMPANIONS = [
+  { slug: "soots", name: "Soot sprites", blurb: "Fuzzy Ghibli puffballs that roam, march & carry stars", icon: Bug },
+  { slug: "fireflies", name: "Fireflies", blurb: "Glowing motes that drift and scatter from your cursor", icon: Sparkles },
+  { slug: "none", name: "None", blurb: "A quiet page — no little creatures", icon: CircleOff },
+];
+
+export const DEFAULT_COMPANION = "soots";
+
+// Per-creature tunables the user can adjust in Settings (size/speed are multipliers).
+export const DEFAULT_CREATURES = {
+  soot: { count: 30, size: 1, speed: 1 },
+  firefly: { count: 60, size: 1, speed: 1 },
+};
+
+export const CREATURE_RANGES = {
+  soot: {
+    count: { min: 0, max: 60, step: 1 },
+    size: { min: 0.5, max: 2, step: 0.1 },
+    speed: { min: 0.3, max: 2.5, step: 0.1 },
+  },
+  firefly: {
+    count: { min: 0, max: 160, step: 5 },
+    size: { min: 0.5, max: 2.5, step: 0.1 },
+    speed: { min: 0.3, max: 2.5, step: 0.1 },
+  },
+};

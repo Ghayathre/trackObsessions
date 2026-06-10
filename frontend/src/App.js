@@ -13,7 +13,7 @@ import Activity from "@/pages/Activity";
 import PublicProfile from "@/pages/PublicProfile";
 import Layout from "@/components/Layout";
 import AmbientBackground from "@/components/AmbientBackground";
-import FireflyTrail from "@/components/FireflyTrail";
+import Companions from "@/components/Companions";
 import { PageTransition } from "@/lib/motion";
 
 // Persistent layout route — sidebar stays mounted, only the page-content area transitions.
@@ -62,7 +62,7 @@ export default function App() {
       <AuthProvider>
         <ThemeProvider>
           <AmbientBackground />
-          <FireflyTrail />
+          <Companions />
           <AppRoutes />
           <Toaster richColors position="top-right" />
         </ThemeProvider>

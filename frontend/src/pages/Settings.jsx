@@ -3,6 +3,8 @@ import { listApiKeys, createApiKey, revokeApiKey, updateProfile } from "../lib/d
 import ThemePicker from "../components/ThemePicker";
 import StylePicker from "../components/StylePicker";
 import MotionPicker from "../components/MotionPicker";
+import CompanionPicker from "../components/CompanionPicker";
+import CreatureControls from "../components/CreatureControls";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -176,6 +178,18 @@ export default function Settings() {
           reduced motion, we honour that automatically.)
         </p>
         <MotionPicker />
+      </section>
+
+      {/* Companions */}
+      <section>
+        <h2 className="font-display font-bold text-2xl mb-3">Companions</h2>
+        <p className="text-sm text-muted-foreground mb-5 max-w-2xl">
+          The little creatures that live on your page. <b>Soot sprites</b> roam, march along
+          the border and carry star-candy; <b>Fireflies</b> drift and glow; or pick <b>None</b>
+          for a quiet page. (They follow your Motion preset — hidden under Minimal / reduced motion.)
+        </p>
+        <CompanionPicker />
+        <CreatureControls />
       </section>
 
       {/* Imports */}

@@ -662,11 +662,11 @@ body {
   box-shadow: 0 0 0 1px hsl(var(--primary) / 0.3), 0 8px 30px hsl(var(--primary) / 0.18);
 }
 
-/* Firefly cursor swarm (positions driven from JS in FireflyTrail.jsx). */
+/* Firefly field (positions driven from JS in Fireflies.jsx). */
 .hanabi-fireflies {
   position: fixed;
   inset: 0;
-  z-index: -1; /* ambient background layer, behind page content */
+  z-index: -1;
   pointer-events: none;
   overflow: hidden;
 }
@@ -674,13 +674,66 @@ body {
   position: absolute;
   top: 0;
   left: 0;
+  border-radius: 9999px;
   pointer-events: none;
-  user-select: none;
   will-change: transform, opacity;
-  font-family: "Segoe UI Symbol", "Apple Symbols", sans-serif;
 }
 @media (prefers-reduced-motion: reduce) {
   .hanabi-fireflies { display: none; }
+}
+
+/* Soot-sprite field (positions driven from JS in SootSprites.jsx). */
+.hanabi-soot-field {
+  position: fixed;
+  inset: 0;
+  z-index: -1; /* back in the background, behind page content */
+  pointer-events: none;
+  overflow: hidden;
+}
+.hanabi-soot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  will-change: transform;
+  /* The highlight rim is drawn inside the SVG (currentColor) — no per-frame CSS filter,
+     which keeps the animation cheap. Foreground colour adapts the rim to the theme. */
+  color: hsl(var(--foreground));
+}
+.soot-eyes {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation-name: sootBlink;
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-in-out;
+}
+/* Star-candy (konpeito) a sprite carries — fades in/out as it picks things up */
+.soot-star {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translate(-50%, -95%);
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  text-shadow: 0 0 5px currentColor;
+}
+/* Faint cobwebs in the corners — the sprites have been living here a while */
+.soot-web {
+  position: fixed;
+  color: hsl(var(--foreground));
+  opacity: 0.16;
+  pointer-events: none;
+}
+.soot-web-tl { top: 0; left: 0; }
+.soot-web-br { bottom: 0; right: 0; transform: rotate(180deg); }
+@keyframes sootBlink {
+  0%, 92%, 100% { transform: scaleY(1); }
+  96% { transform: scaleY(0.08); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hanabi-soot-field { display: none; }
+  .soot-eyes { animation: none; }
 }
 
 /* Typewriter caret — a solid block that scales with the text it follows. */
