@@ -398,16 +398,6 @@ export default function SootSprites() {
 
   return (
     <div className="hanabi-soot-field" aria-hidden="true">
-      {/* shared fuzzy-edge filter, defined once and referenced by every sprite */}
-      <svg width="0" height="0" style={{ position: "absolute" }}>
-        <defs>
-          <filter id="hanabiSootFuzz" x="-30%" y="-30%" width="160%" height="160%">
-            <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="7" result="n" />
-            <feDisplacementMap in="SourceGraphic" in2="n" scale="5" />
-          </filter>
-        </defs>
-      </svg>
-
       {/* faint cobwebs in two corners — the sprites have clearly been living here */}
       <CornerWeb className="soot-web soot-web-tl" />
       <CornerWeb className="soot-web soot-web-br" />
@@ -433,7 +423,16 @@ export default function SootSprites() {
               ✦
             </span>
             <svg viewBox="0 0 44 44" width="100%" height="100%">
-              <g filter="url(#hanabiSootFuzz)">
+              {/* Each sprite carries its own fuzz filter. A shared filter in a separate
+                  <svg> isn't resolved cross-element by Safari/Firefox (the body then
+                  doesn't paint at all), so we keep the reference inside this same <svg>. */}
+              <defs>
+                <filter id={`hanabiSootFuzz${i}`} x="-30%" y="-30%" width="160%" height="160%">
+                  <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="7" result="n" />
+                  <feDisplacementMap in="SourceGraphic" in2="n" scale="5" />
+                </filter>
+              </defs>
+              <g filter={`url(#hanabiSootFuzz${i})`}>
                 {/* highlight rim underlay (foreground colour via currentColor) */}
                 <path d="M12 13 L16 2.5 L20 13 Z M21 11 L25 1.5 L29 11 Z M29 14 L33 5 L36 15 Z" fill="currentColor" />
                 <circle cx="22" cy="24" r="15.6" fill="currentColor" />
