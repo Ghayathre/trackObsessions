@@ -18,6 +18,7 @@ import {
 } from "./ui/alert-dialog";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
+import { Float } from "../lib/motion";
 import { toast } from "sonner";
 
 const ICONS = { Clapperboard, Heart, BookOpen, Library, Sparkles, Hash };
@@ -86,7 +87,7 @@ export default function Layout({ children }) {
   };
 
   return (
-    <div className="min-h-screen flex bg-background text-foreground">
+    <div className="min-h-screen flex text-foreground">
       {/* Desktop sidebar */}
       <aside className="hidden md:flex flex-col w-72 border-r border-border bg-card/40 backdrop-blur-xl sticky top-0 h-screen" data-testid="sidebar">
         <SidebarContent {...sidebarProps} />
@@ -146,9 +147,9 @@ function SidebarContent({ cats, pending, user, theme, onInbox, onLogout, onCreat
   return (
     <div className="flex flex-col h-full">
       <div className="p-6 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-primary text-primary-foreground grid place-items-center hanabi-glow">
+        <Float className="w-10 h-10 rounded-xl bg-primary text-primary-foreground grid place-items-center hanabi-glow">
           <Flame className="w-5 h-5" />
-        </div>
+        </Float>
         <div>
           <div className="font-display font-black text-xl leading-none">Hanabi</div>
           <div className="text-xs text-muted-foreground mt-0.5">Hobby tracker</div>

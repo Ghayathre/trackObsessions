@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { listApiKeys, createApiKey, revokeApiKey, updateProfile } from "../lib/db";
 import ThemePicker from "../components/ThemePicker";
 import StylePicker from "../components/StylePicker";
+import MotionPicker from "../components/MotionPicker";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -163,6 +164,18 @@ export default function Settings() {
           Styles control the whole <i>vibe</i> — fonts, radius, textures <b>and</b> colour palette. Pick <b>Hanabi Default</b> if you want the Theme picker above to drive colour; pick any other style for a curated complete look.
         </p>
         <StylePicker />
+      </section>
+
+      {/* Motion */}
+      <section>
+        <h2 className="font-display font-bold text-2xl mb-3">Motion</h2>
+        <p className="text-sm text-muted-foreground mb-5 max-w-2xl">
+          Controls how Hanabi <i>moves</i> — entrances, hovers, page transitions and the ambient
+          background. Pick <b>Antigravity</b> for a weightless, floating feel, <b>Calm</b> for something
+          smooth and understated, or <b>Minimal</b> to keep things quiet. (If your device asks for
+          reduced motion, we honour that automatically.)
+        </p>
+        <MotionPicker />
       </section>
 
       {/* Imports */}

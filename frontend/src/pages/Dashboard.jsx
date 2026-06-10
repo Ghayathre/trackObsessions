@@ -6,7 +6,7 @@ import { TrendingUp, Eye, CheckCircle2, Bookmark, Sparkles, Timer } from "lucide
 import MediaCard from "../components/MediaCard";
 import ActivityFeed from "../components/ActivityFeed";
 import { motion } from "framer-motion";
-import { Reveal, CountUp, staggerContainer, staggerItem } from "../lib/motion";
+import { Reveal, CountUp, useStagger, Parallax, Typewriter } from "../lib/motion";
 
 const STATS = [
   { key: "watching", label: "In progress", icon: Eye },
@@ -26,6 +26,7 @@ export default function Dashboard() {
   const [data, setData] = useState(null);
   const [activity, setActivity] = useState([]);
   const [categories, setCategories] = useState([]);
+  const { container: staggerContainer, item: staggerItem } = useStagger();
 
   const load = async () => {
     const [s, a, cats] = await Promise.all([getStats(), listActivity(6), listCategories()]);
@@ -42,10 +43,20 @@ export default function Dashboard() {
     <div className="space-y-12">
       <Reveal y={32}>
         <header className="space-y-2">
-          <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Your library</div>
-          <h1 className="text-4xl sm:text-5xl font-display font-black tracking-tight">Welcome back.</h1>
+          {/* Types out in sequence: kicker → heading → blurb. Delays are cumulative
+              (≈ previous lines' length × speed + a short pause). */}
+          <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+            <Typewriter text="Your library" speed={70} startDelay={250} />
+          </div>
+          <h1 className="text-4xl sm:text-5xl font-display font-black tracking-tight">
+            <Typewriter text="Welcome back." speed={105} startDelay={1350} />
+          </h1>
           <p className="text-muted-foreground max-w-xl">
-            A snapshot of everything you're watching, reading, and dreaming about — kept in sync by the Hanabi extension.
+            <Typewriter
+              text="A snapshot of everything you're watching, reading, and dreaming about — kept in sync by the Hanabi extension."
+              speed={55}
+              startDelay={3050}
+            />
           </p>
         </header>
       </Reveal>
@@ -58,9 +69,9 @@ export default function Dashboard() {
         initial="hidden"
         animate="show"
       >
-        {STATS.map(({ key, label, icon: Icon }) => (
+        {STATS.map(({ key, label, icon: Icon }, i) => (
           <motion.div key={key} variants={staggerItem}>
-            <Card className="p-5 transition-transform hover:-translate-y-1 duration-300">
+            <Card className="p-5 transition-transform hover:-translate-y-1 duration-300 hanabi-drift" style={{ "--drift-delay": `-${i * 0.8}s` }}>
               <div className="flex items-center justify-between">
                 <div className="text-xs uppercase tracking-wider text-muted-foreground">{label}</div>
                 <Icon className="w-4 h-4 text-primary" />
@@ -72,7 +83,7 @@ export default function Dashboard() {
           </motion.div>
         ))}
         <motion.div variants={staggerItem}>
-          <Card className="p-5 bg-primary/10 border-primary/30 transition-transform hover:-translate-y-1 duration-300" data-testid="stat-hours-card">
+          <Card className="p-5 bg-primary/10 border-primary/30 transition-transform hover:-translate-y-1 duration-300 hanabi-drift" style={{ "--drift-delay": "-4s" }} data-testid="stat-hours-card">
             <div className="flex items-center justify-between">
               <div className="text-xs uppercase tracking-wider text-primary/90">Hours logged</div>
               <Timer className="w-4 h-4 text-primary" />
@@ -96,6 +107,7 @@ export default function Dashboard() {
       )}
 
       {/* By-category chart + Activity */}
+      <Parallax offset={36}>
       <Reveal>
         <section className="grid lg:grid-cols-3 gap-6">
           <Card className="p-6 lg:col-span-2">
@@ -139,8 +151,10 @@ export default function Dashboard() {
           </Card>
         </section>
       </Reveal>
+      </Parallax>
 
       {/* Recent */}
+      <Parallax offset={64}>
       <Reveal>
         <section>
           <div className="flex items-baseline justify-between mb-4">
@@ -168,6 +182,7 @@ export default function Dashboard() {
           )}
         </section>
       </Reveal>
+      </Parallax>
     </div>
   );
 }

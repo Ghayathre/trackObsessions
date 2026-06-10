@@ -8,7 +8,7 @@ import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
 import { Search, Share2 } from "lucide-react";
 import { motion } from "framer-motion";
-import { Reveal, staggerContainer, staggerItem } from "../lib/motion";
+import { Reveal, useStagger, Parallax } from "../lib/motion";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
 
@@ -29,6 +29,7 @@ export default function Category() {
   const [items, setItems] = useState([]);
   const [filter, setFilter] = useState("all");
   const [q, setQ] = useState("");
+  const { container: staggerContainer, item: staggerItem } = useStagger();
 
   const load = async () => {
     const [titles, cats] = await Promise.all([
@@ -129,7 +130,7 @@ export default function Category() {
         </motion.div>
       )}
 
-      {cat && <Reveal>{<CategoryLinks categoryId={cat.id} />}</Reveal>}
+      {cat && <Parallax offset={48}><Reveal>{<CategoryLinks categoryId={cat.id} />}</Reveal></Parallax>}
     </div>
   );
 }

@@ -12,6 +12,8 @@ import Settings from "@/pages/Settings";
 import Activity from "@/pages/Activity";
 import PublicProfile from "@/pages/PublicProfile";
 import Layout from "@/components/Layout";
+import AmbientBackground from "@/components/AmbientBackground";
+import FireflyTrail from "@/components/FireflyTrail";
 import { PageTransition } from "@/lib/motion";
 
 // Persistent layout route — sidebar stays mounted, only the page-content area transitions.
@@ -59,6 +61,8 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <ThemeProvider>
+          <AmbientBackground />
+          <FireflyTrail />
           <AppRoutes />
           <Toaster richColors position="top-right" />
         </ThemeProvider>

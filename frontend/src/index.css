@@ -662,6 +662,39 @@ body {
   box-shadow: 0 0 0 1px hsl(var(--primary) / 0.3), 0 8px 30px hsl(var(--primary) / 0.18);
 }
 
+/* Firefly cursor swarm (positions driven from JS in FireflyTrail.jsx). */
+.hanabi-fireflies {
+  position: fixed;
+  inset: 0;
+  z-index: -1; /* ambient background layer, behind page content */
+  pointer-events: none;
+  overflow: hidden;
+}
+.hanabi-firefly {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  user-select: none;
+  will-change: transform, opacity;
+  font-family: "Segoe UI Symbol", "Apple Symbols", sans-serif;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hanabi-fireflies { display: none; }
+}
+
+/* Typewriter caret — a solid block that scales with the text it follows. */
+@keyframes caretBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+.tw-caret {
+  display: inline-block;
+  width: 0.6em;
+  height: 1.05em;
+  margin-left: 0.08em;
+  vertical-align: -0.16em;
+  background: hsl(var(--primary));
+  animation: caretBlink 1.05s steps(1, end) infinite;
+}
+
 .gradient-text {
   background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)));
   -webkit-background-clip: text;
@@ -674,6 +707,116 @@ body {
   to   { opacity: 1; transform: translateY(0); }
 }
 .fade-up { animation: fadeUp .55s cubic-bezier(.2,.7,.2,1) both; }
+
+/* ---------- MOTION PRESETS (ambient atmosphere + idle float) ---------- */
+/* JS timing/physics live in src/data/motion.js; this section is the CSS half:
+   the drifting background and the opt-in float utility, tuned per `motion-<slug>`. */
+
+/* Drifting colour-blob layer rendered by <AmbientBackground/>. Sits behind everything. */
+.hanabi-ambient {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  contain: strict;
+}
+.hanabi-blob {
+  position: absolute;
+  display: block;
+  border-radius: 50%;
+  filter: blur(70px);
+  will-change: transform;
+  opacity: var(--ambient-opacity, 0.5);
+}
+.hanabi-blob-1 {
+  top: -12vh; left: -8vw;
+  width: 46vw; height: 46vw;
+  background: radial-gradient(circle at center, hsl(var(--primary) / 0.9), transparent 65%);
+  animation: ambientDrift1 var(--ambient-speed, 26s) ease-in-out infinite alternate;
+}
+.hanabi-blob-2 {
+  bottom: -18vh; right: -10vw;
+  width: 52vw; height: 52vw;
+  background: radial-gradient(circle at center, hsl(var(--accent) / 0.85), transparent 65%);
+  animation: ambientDrift2 var(--ambient-speed-2, 34s) ease-in-out infinite alternate;
+}
+.hanabi-blob-3 {
+  top: 30vh; left: 40vw;
+  width: 38vw; height: 38vw;
+  background: radial-gradient(circle at center, hsl(var(--secondary) / 0.7), transparent 60%);
+  animation: ambientDrift3 var(--ambient-speed-3, 30s) ease-in-out infinite alternate;
+}
+@keyframes ambientDrift1 {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(8vw, 10vh, 0) scale(1.18); }
+}
+@keyframes ambientDrift2 {
+  from { transform: translate3d(0, 0, 0) scale(1.05); }
+  to   { transform: translate3d(-10vw, -8vh, 0) scale(0.85); }
+}
+@keyframes ambientDrift3 {
+  from { transform: translate3d(0, 0, 0) scale(0.9); }
+  to   { transform: translate3d(-6vw, 12vh, 0) scale(1.15); }
+}
+
+/* Antigravity — full, glowing, lively drift. */
+.motion-antigravity .hanabi-ambient {
+  --ambient-opacity: 0.62;
+  --ambient-speed: 16s; --ambient-speed-2: 21s; --ambient-speed-3: 18s;
+}
+.motion-antigravity .hanabi-blob { filter: blur(80px); }
+
+/* Calm — present but quiet: lower opacity, slower, softer. */
+.motion-calm .hanabi-ambient { --ambient-opacity: 0.28; --ambient-speed: 42s; --ambient-speed-2: 52s; --ambient-speed-3: 48s; }
+.motion-calm .hanabi-blob { filter: blur(90px); }
+
+/* Light themes: dial the wash back so text stays crisp. */
+.theme-sakura .hanabi-ambient, .theme-matcha .hanabi-ambient, .theme-monochrome .hanabi-ambient,
+.theme-honey .hanabi-ambient, .theme-arctic .hanabi-ambient, .theme-ghibli .hanabi-ambient {
+  --ambient-opacity: 0.22;
+}
+.motion-antigravity.theme-sakura .hanabi-ambient,
+.motion-antigravity.theme-matcha .hanabi-ambient,
+.motion-antigravity.theme-monochrome .hanabi-ambient,
+.motion-antigravity.theme-honey .hanabi-ambient,
+.motion-antigravity.theme-arctic .hanabi-ambient,
+.motion-antigravity.theme-ghibli .hanabi-ambient { --ambient-opacity: 0.32; }
+
+/* Idle float — opt-in via <Float> / .motion-float, only animates under antigravity. */
+@keyframes hanabiFloat {
+  0%   { transform: translateY(0) rotate(0deg); }
+  50%  { transform: translateY(-11px) rotate(-3deg); }
+  100% { transform: translateY(0) rotate(0deg); }
+}
+.motion-antigravity .motion-float { animation: hanabiFloat 5s ease-in-out infinite; will-change: transform; }
+
+/* Continuous "zero-gravity" drift for cards. Each element gets a negative
+   animation-delay (set inline, varied per item) so the grid shimmers out of phase
+   instead of bobbing in unison. Antigravity-only; inert everywhere else. */
+@keyframes hanabiDrift {
+  0%   { transform: translate3d(0, 0, 0) rotate(0deg); }
+  30%  { transform: translate3d(5px, -16px, 0) rotate(0.7deg); }
+  60%  { transform: translate3d(-5px, -9px, 0) rotate(-0.6deg); }
+  100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+}
+.motion-antigravity .hanabi-drift {
+  animation: hanabiDrift var(--drift-dur, 5.5s) ease-in-out infinite;
+  animation-delay: var(--drift-delay, 0s);
+  will-change: transform;
+}
+/* Cards lift toward the light + glow as they rise on hover. */
+.motion-antigravity .hanabi-drift { transition: box-shadow .4s ease, filter .4s ease; }
+.motion-antigravity .hanabi-drift:hover {
+  box-shadow: 0 18px 50px hsl(var(--primary) / 0.28), 0 0 0 1px hsl(var(--primary) / 0.25);
+}
+
+/* Respect the OS. The provider also forces motion-minimal, but guard the CSS half too. */
+@media (prefers-reduced-motion: reduce) {
+  .hanabi-ambient { display: none; }
+  .motion-float, .hanabi-drift { animation: none !important; }
+  .fade-up { animation: none; }
+}
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: hsl(var(--muted)); border-radius: 999px; }

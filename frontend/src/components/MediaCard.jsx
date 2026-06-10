@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card } from "./ui/card";
 import { Star, Plus, Minus, Trash2, RefreshCw, Globe, Calendar, Hash } from "lucide-react";
 import { motion } from "framer-motion";
+import { useMotion } from "../context/ThemeContext";
 import { refreshTitle, updateTitle, deleteTitle } from "../lib/db";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
 import {
@@ -32,7 +33,16 @@ const STATUS_COLOR = {
 };
 
 export default function MediaCard({ item, onChange, kind = "video", categories = [] }) {
+  const { tokens } = useMotion();
   const [open, setOpen] = useState(false);
+
+  // Stable per-card phase offset (−0…−6s) so the floating grid never bobs in unison.
+  const driftStyle = useMemo(() => {
+    let h = 0;
+    const s = String(item.id || item.title || "");
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+    return { "--drift-delay": `-${(h % 6000) / 1000}s`, "--drift-dur": `${5 + (h % 1800) / 1000}s` };
+  }, [item.id, item.title]);
   const [draft, setDraft] = useState(item);
   const [coverFailed, setCoverFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -95,13 +105,14 @@ export default function MediaCard({ item, onChange, kind = "video", categories =
   return (
     <>
       <motion.div
-        whileHover={{ y: -6, scale: 1.035 }}
+        whileHover={{ y: tokens.hoverLift, scale: tokens.hoverScale }}
         whileTap={{ scale: 0.985 }}
-        transition={{ type: "spring", stiffness: 280, damping: 22 }}
+        transition={tokens.spring}
       >
         <Card
           onClick={() => { setDraft(item); setOpen(true); }}
-          className="group relative overflow-hidden cursor-pointer border-border bg-card aspect-[2/3] fade-up"
+          style={driftStyle}
+          className="group relative overflow-hidden cursor-pointer border-border bg-card aspect-[2/3] fade-up hanabi-drift"
           data-testid={`media-card-${item.id}`}
         >
         {item.cover_url && !coverFailed ? (
