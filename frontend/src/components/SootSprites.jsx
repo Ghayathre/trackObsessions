@@ -25,6 +25,9 @@ const HOME_FORCE = 0.02;
 const FOLLOW_FORCE = 0.08; // tighter spring when marching in a train
 const IDLE_AMP = 10;
 const MAX_SPEED = 34;
+const EYE_AMP = 2.0; // how far the pupils swivel (SVG user units) when watching something
+const GLANCE_R = 200; // glance at the cursor when it's within this many px
+const WATCH_R = 620; // a nosy idle soot within this of the caret may drift over to peek
 const TRAIN_SPACING = 26; // px gap between sprites in a line
 const TRAIN_SIZE = 4; // dedicated soots that permanently march the border (leader + 3)
 
@@ -40,6 +43,7 @@ export default function SootSprites() {
   const sizeMul = cfg.size;
   const nodesRef = useRef([]);
   const starsRef = useRef([]);
+  const pupilsRef = useRef([]); // the <g> wrapping each sprite's two pupils, moved to aim its gaze
   const speedRef = useRef(cfg.speed); // read live so the speed slider needs no re-init
   useEffect(() => { speedRef.current = cfg.speed; }, [cfg.speed]);
 
@@ -61,7 +65,8 @@ export default function SootSprites() {
         // free-roaming sprite
         const fx = Math.random();
         const fy = Math.random();
-        const p = PERSONALITIES[(Math.random() * PERSONALITIES.length) | 0];
+        const pi = (Math.random() * PERSONALITIES.length) | 0;
+        const p = PERSONALITIES[pi];
         const r = REPEL_RADIUS * p.repel;
         return {
           x: fx * W, y: fy * H, vx: 0, vy: 0,
@@ -75,6 +80,7 @@ export default function SootSprites() {
           maxSp: MAX_SPEED, leadK: 0.035, followK: FOLLOW_FORCE,
           mode: MODE_IDLE, ahead: -1, carrying: false, until: 0,
           border: false, corner: 0,
+          nosy: pi >= 2, watch: false, // playful & curious ones peek at what you're typing
         };
       }
       // dedicated train member — leader (n=0) marches the border forever; rest chain behind
@@ -97,6 +103,7 @@ export default function SootSprites() {
         border: isLeader, corner: 0,
         dir: Math.random() < 0.5 ? 1 : -1, // which way it walks the border
         paused: false, wait: 0,
+        nosy: false, watch: false, // the train keeps marching; it doesn't stop to gawk
       };
     });
 
@@ -130,7 +137,7 @@ export default function SootSprites() {
       let picked = 0;
       for (let i = 0; i < count && picked < 2; i++) {
         const s = state[i];
-        if (s.mode !== MODE_IDLE) continue;
+        if (s.mode !== MODE_IDLE || s.watch) continue;
         const dx = s.x - leader.x, dy = s.y - leader.y;
         if (dx * dx + dy * dy < 360 * 360) {
           const ang = Math.random() * Math.PI * 2;
@@ -169,7 +176,7 @@ export default function SootSprites() {
     // ---- director: occasionally sends sprites off to do things ----
     const idleOnes = () => {
       const out = [];
-      for (let i = 0; i < count; i++) if (state[i].mode === MODE_IDLE) out.push(i);
+      for (let i = 0; i < count; i++) if (state[i].mode === MODE_IDLE && !state[i].watch) out.push(i);
       return out;
     };
     const fireEvent = (t) => {
@@ -195,11 +202,81 @@ export default function SootSprites() {
     window.addEventListener("mouseout", onLeave, { passive: true });
     window.addEventListener("resize", onResize, { passive: true });
 
+    // ---- "what are you typing?" : follow the caret of the focused text field ----
+    // The soots sit behind the content (z-index -1), so peeking never covers your text.
+    const measure = (() => { try { return document.createElement("canvas").getContext("2d"); } catch { return null; } })();
+    const TEXT_SEL = "input, textarea, [contenteditable=''], [contenteditable='true']";
+    const ALLOW_TYPES = new Set(["text", "search", "email", "url", "tel", "password", "number", ""]);
+    const isTextEl = (el) => {
+      if (!el || !el.matches || !el.matches(TEXT_SEL)) return false;
+      if (el.disabled || el.readOnly) return false;
+      if (el.tagName === "INPUT") return ALLOW_TYPES.has(el.type || "");
+      return true;
+    };
+    // Pixel position of the caret (so their eyes land where the letters appear).
+    const caretPoint = (el) => {
+      const r = el.getBoundingClientRect();
+      if (el.tagName === "INPUT" && measure) {
+        const st = getComputedStyle(el);
+        measure.font = `${st.fontWeight} ${st.fontSize} ${st.fontFamily}`;
+        const val = el.value || "";
+        const caret = el.selectionStart == null ? val.length : el.selectionStart;
+        const w = measure.measureText(val.slice(0, caret)).width;
+        const padL = parseFloat(st.paddingLeft) || 0;
+        const x = Math.min(r.left + padL + w - (el.scrollLeft || 0), r.right - 4);
+        return { x, y: r.top + r.height / 2 };
+      }
+      // textarea / contenteditable: a gentle aim at the upper-left of the text area
+      return { x: r.left + Math.min(40, r.width * 0.4), y: r.top + Math.min(28, r.height / 2) };
+    };
+    const attention = { x: 0, y: 0, active: false, until: 0, assigned: false, el: null };
+    const nowSec = () => performance.now() / 1000;
+    const engage = (el, fresh) => {
+      const p = caretPoint(el);
+      attention.x = p.x; attention.y = p.y;
+      attention.until = nowSec() + 3; // attention lapses ~3s after you stop typing
+      if (fresh || attention.el !== el || !attention.active) attention.assigned = false;
+      attention.active = true;
+      attention.el = el;
+    };
+    const onFocusIn = (e) => { if (isTextEl(e.target)) engage(e.target, true); };
+    const onInput = (e) => { if (e.target === attention.el || isTextEl(e.target)) engage(e.target, false); };
+    const onSelChange = () => { const el = document.activeElement; if (el && el === attention.el) engage(el, false); };
+    const onFocusOut = (e) => { if (e.target === attention.el) attention.until = Math.min(attention.until, nowSec() + 0.8); };
+    document.addEventListener("focusin", onFocusIn, true);
+    document.addEventListener("input", onInput, true);
+    document.addEventListener("selectionchange", onSelChange);
+    document.addEventListener("focusout", onFocusOut, true);
+
+    // A couple of nearby nosy soots wander over to a respectful spot beside the caret.
+    const assignWatchers = () => {
+      const offs = [-64, 24, -120, 96];
+      let picked = 0;
+      for (let i = 0; i < count && picked < 3; i++) {
+        const s = state[i];
+        if (!s.nosy || s.mode !== MODE_IDLE) continue;
+        const dx = s.x - attention.x, dy = s.y - attention.y;
+        if (dx * dx + dy * dy < WATCH_R * WATCH_R) {
+          s.watch = true;
+          s.fx = Math.min(0.96, Math.max(0.04, (attention.x + offs[picked]) / W));
+          s.fy = Math.min(0.94, Math.max(0.06, (attention.y + 70 + (picked % 2) * 26) / H));
+          picked++;
+        }
+      }
+      attention.assigned = true;
+    };
+    const clearWatchers = () => { for (let i = 0; i < count; i++) state[i].watch = false; };
+
     let raf;
     const loop = (now) => {
       const t = now / 1000;
       const spd = speedRef.current; // live speed multiplier from the slider
       if (t > nextEvent) { fireEvent(t); nextEvent = t + 10 + Math.random() * 12; }
+
+      // typing attention: enlist watchers when it begins, release them when it lapses
+      const attentive = attention.active && t < attention.until;
+      if (attention.active && !attentive) { attention.active = false; clearWatchers(); }
+      else if (attentive && !attention.assigned) assignWatchers();
 
       for (let i = 0; i < total; i++) {
         const s = state[i];
@@ -278,6 +355,27 @@ export default function SootSprites() {
         }
         const star = starsRef.current[i];
         if (star) star.style.opacity = s.carrying ? "1" : "0";
+
+        // gaze: watch the caret if enlisted, else glance at a nearby cursor, else idle drift
+        const pg = pupilsRef.current[i];
+        if (pg) {
+          let gx, gy, gazing = false;
+          if (attentive && s.watch) { gx = attention.x; gy = attention.y; gazing = true; }
+          else {
+            const mdx = s.x - mouse.x, mdy = s.y - mouse.y;
+            if (mdx * mdx + mdy * mdy < GLANCE_R * GLANCE_R) { gx = mouse.x; gy = mouse.y; gazing = true; }
+          }
+          let ox, oy;
+          if (gazing) {
+            const ex = gx - s.x, ey = gy - s.y;
+            const el = Math.hypot(ex, ey) || 1;
+            ox = (ex / el) * EYE_AMP; oy = (ey / el) * EYE_AMP;
+          } else {
+            ox = Math.sin(t * 0.7 + s.phase) * 1.1;
+            oy = Math.cos(t * 0.55 + s.phase) * 0.7;
+          }
+          pg.setAttribute("transform", `translate(${ox.toFixed(2)} ${oy.toFixed(2)})`);
+        }
       }
       raf = requestAnimationFrame(loop);
     };
@@ -287,6 +385,10 @@ export default function SootSprites() {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseout", onLeave);
       window.removeEventListener("resize", onResize);
+      document.removeEventListener("focusin", onFocusIn, true);
+      document.removeEventListener("input", onInput, true);
+      document.removeEventListener("selectionchange", onSelChange);
+      document.removeEventListener("focusout", onFocusOut, true);
       cancelAnimationFrame(raf);
     };
   }, [count, active]);
@@ -314,8 +416,6 @@ export default function SootSprites() {
         const size = (18 + (i % 5) * 4) * sizeMul; // base 18–34px, scaled by the size slider
         const body = BODIES[i % BODIES.length];
         const star = STAR_COLORS[i % STAR_COLORS.length];
-        const lookX = (Math.random() * 2 - 1) * 1.4;
-        const lookY = (Math.random() * 2 - 1) * 0.9;
         const blinkDur = (3.4 + (i % 6) * 0.7).toFixed(2);
         const blinkDelay = ((i * 0.37) % 5).toFixed(2);
         return (
@@ -344,8 +444,10 @@ export default function SootSprites() {
               <g className="soot-eyes" style={{ animationDuration: `${blinkDur}s`, animationDelay: `-${blinkDelay}s` }}>
                 <ellipse cx="17.5" cy="21" rx="4" ry="5" fill="#fdfdfd" />
                 <ellipse cx="26.5" cy="21" rx="4" ry="5" fill="#fdfdfd" />
-                <circle cx={17.5 + lookX} cy={21 + lookY} r="1.7" fill="#1b1b1b" />
-                <circle cx={26.5 + lookX} cy={21 + lookY} r="1.7" fill="#1b1b1b" />
+                <g ref={(el) => (pupilsRef.current[i] = el)}>
+                  <circle cx="17.5" cy="21" r="1.7" fill="#1b1b1b" />
+                  <circle cx="26.5" cy="21" r="1.7" fill="#1b1b1b" />
+                </g>
               </g>
             </svg>
           </span>
