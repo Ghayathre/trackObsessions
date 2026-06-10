@@ -11,7 +11,7 @@ const TYPE_TO_SLUG = {
   kdrama: "kdramas", "thai-bl": "thai-bl", tv: "kdramas",
 };
 
-export default function SnapToAddDialog({ categories = [], onAdded }) {
+export default function SnapToAddDialog({ categories = [], onAdded, compact = false }) {
   const [open, setOpen] = useState(false);
   const inputRef = useRef(null);
   const [file, setFile] = useState(null);
@@ -90,9 +90,15 @@ export default function SnapToAddDialog({ categories = [], onAdded }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" data-testid="open-snap-add">
-          <Camera className="w-3.5 h-3.5 mr-1" /> Snap to add
-        </Button>
+        {compact ? (
+          <Button variant="outline" size="icon" className="w-9 h-9" title="Snap to add" aria-label="Snap to add" data-testid="open-snap-add">
+            <Camera className="w-4 h-4" />
+          </Button>
+        ) : (
+          <Button variant="outline" size="sm" data-testid="open-snap-add">
+            <Camera className="w-3.5 h-3.5 mr-1" /> Snap to add
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="max-w-lg" data-testid="snap-dialog">
         <DialogHeader>
