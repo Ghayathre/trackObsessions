@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { listCategories, listSuggestions, createCategory, deleteCategory } from "../lib/db";
 import {
   Home, Settings, Plus, LogOut, Sparkles, Bell, Flame, Menu, GripVertical,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, ChevronDown,
   Clapperboard, Heart, BookOpen, Library, Hash, Activity as ActivityIcon
 } from "lucide-react";
 import { Button } from "./ui/button";
@@ -12,6 +12,7 @@ import HanabiInbox from "./HanabiInbox";
 import SnapToAddDialog from "./SnapToAddDialog";
 import { Sheet, SheetContent } from "./ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "./ui/dropdown-menu";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -360,7 +361,7 @@ function VerticalBar({ cats, pending, user, dock, onDragStart, onInbox, onLogout
   );
 }
 
-function HorizontalBar({ cats, pending, user, onDragStart, onInbox, onLogout, onCreateCategory, onDeleteCategory, onSnapAdded, onNavigate = () => {} }) {
+function HorizontalBar({ cats, pending, user, dock, onDragStart, onInbox, onLogout, onCreateCategory, onSnapAdded, onNavigate = () => {} }) {
   return (
     <div className="flex items-center gap-2 w-full h-16 px-3">
       {onDragStart && <DragHandle onDragStart={onDragStart} />}
@@ -389,10 +390,8 @@ function HorizontalBar({ cats, pending, user, onDragStart, onInbox, onLogout, on
 
       <div className="w-px h-8 bg-border shrink-0" />
 
-      <div className="flex items-center gap-1 overflow-x-auto flex-1 min-w-0 py-1">
-        {cats.map((c) => (
-          <CategoryItem key={c.id} c={c} orientation="horizontal" onNavigate={onNavigate} onDeleteCategory={onDeleteCategory} />
-        ))}
+      <div className="flex items-center gap-1.5 shrink-0">
+        <CollectionsDropdown cats={cats} onNavigate={onNavigate} side={dock === "bottom" ? "top" : "bottom"} />
         <NewCollectionDialog onCreateCategory={onCreateCategory} compact />
       </div>
 
@@ -479,6 +478,49 @@ function NewCollectionDialog({ onCreateCategory, compact = false }) {
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// In the horizontal (top/bottom) bar collections live in a dropdown instead of a
+// scrolling strip. `side` opens it away from the docked edge.
+function CollectionsDropdown({ cats, onNavigate, side = "bottom" }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm hover:bg-muted/60 transition-colors"
+          data-testid="collections-dropdown"
+        >
+          <Library className="w-4 h-4" />
+          <span className="hidden lg:inline">Collections</span>
+          <span className="text-xs text-muted-foreground tabular-nums">{cats.length}</span>
+          <ChevronDown className="w-3.5 h-3.5 opacity-60" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" side={side} className="w-56 max-h-[60vh] overflow-y-auto">
+        <DropdownMenuLabel>Collections</DropdownMenuLabel>
+        {cats.length === 0 && (
+          <div className="px-2 py-1.5 text-sm text-muted-foreground">No collections yet</div>
+        )}
+        {cats.map((c) => {
+          const Icon = ICONS[c.icon] || Sparkles;
+          return (
+            <DropdownMenuItem key={c.id} asChild>
+              <NavLink
+                to={`/c/${c.id}`}
+                onClick={onNavigate}
+                data-testid={`nav-category-${c.slug}`}
+                className={({ isActive }) => `flex items-center gap-2 cursor-pointer ${isActive ? "text-primary" : ""}`}
+              >
+                <Icon className="w-4 h-4 shrink-0" />
+                <span className="flex-1 truncate">{c.name}</span>
+                <span className="text-xs text-muted-foreground tabular-nums">{c.count}</span>
+              </NavLink>
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
