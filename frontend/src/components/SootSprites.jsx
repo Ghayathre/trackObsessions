@@ -49,8 +49,7 @@ export default function SootSprites() {
 
   useEffect(() => {
     if (!active) return;
-    if (typeof window === "undefined" || !window.matchMedia) return;
-    if (!window.matchMedia("(pointer: fine)").matches) return;
+    if (typeof window === "undefined") return;
 
     let W = window.innerWidth;
     let H = window.innerHeight;
@@ -413,7 +412,13 @@ export default function SootSprites() {
             key={i}
             ref={(el) => (nodesRef.current[i] = el)}
             className="hanabi-soot"
-            style={{ width: `${size}px`, height: `${size}px` }}
+            // Spread them out from the first paint so they're visible even before the
+            // rAF loop's first frame (the loop overwrites transform in px once running).
+            style={{
+              width: `${size}px`,
+              height: `${size}px`,
+              transform: `translate3d(${((i * 37 + 13) % 96) + 2}vw, ${((i * 59 + 29) % 92) + 4}vh, 0) translate(-50%, -50%)`,
+            }}
           >
             <span
               className="soot-star"
