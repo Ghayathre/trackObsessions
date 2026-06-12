@@ -731,9 +731,22 @@ body {
   0%, 92%, 100% { transform: scaleY(1); }
   96% { transform: scaleY(0.08); }
 }
+/* Each foot swings like a tiny pendulum from where it meets the body; the two
+   feet run half a cycle apart (via inline animation-delay) for a walking shuffle. */
+.soot-foot {
+  transform-box: fill-box;
+  transform-origin: 50% 0%;
+  animation-name: sootStep;
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-in-out;
+}
+@keyframes sootStep {
+  0%, 100% { transform: translateY(0) rotate(7deg); }
+  50% { transform: translateY(-1.1px) rotate(-7deg); }
+}
 @media (prefers-reduced-motion: reduce) {
   .hanabi-soot-field { display: none; }
-  .soot-eyes { animation: none; }
+  .soot-eyes, .soot-foot { animation: none; }
 }
 
 /* Typewriter caret — a solid block that scales with the text it follows. */

@@ -121,5 +121,5 @@ export const useTheme = () => useContext(ThemeContext);
 // Convenience hook for motion-aware components: resolved tokens + the active preset.
 export const useMotion = () => {
   const ctx = useContext(ThemeContext);
-  return { tokens: ctx.motionTokens, motion: ctx.motion, reducedMotion: ctx.reducedMotion, creatures: ctx.creatures };
+  return { tokens: ctx.motionTokens, motion: ctx.motion, reducedMotion: ctx.reducedMotion, creatures: ctx.creatures, theme: ctx.theme };
 };

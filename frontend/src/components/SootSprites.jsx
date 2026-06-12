@@ -1,5 +1,15 @@
 import { useEffect, useRef } from "react";
 import { useMotion } from "../context/ThemeContext";
+import { THEMES } from "../data/themes";
+
+// Relative luminance of a #rrggbb colour — used to tell light themes from dark ones.
+function hexLuminance(hex) {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.slice(0, 2), 16) / 255;
+  const g = parseInt(h.slice(2, 4), 16) / 255;
+  const b = parseInt(h.slice(4, 6), 16) / 255;
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
 
 // Studio-Ghibli-style soot sprites (susuwatari) that treat the page as home and mind
 // their own business: they amble to new spots, occasionally form follow-the-leader trains
@@ -36,8 +46,11 @@ const MODE_LEAD = 1;
 const MODE_FOLLOW = 2;
 
 export default function SootSprites() {
-  const { tokens, creatures } = useMotion();
+  const { tokens, creatures, theme } = useMotion();
   const cfg = creatures.soot;
+  // On dark themes the feet glow in the dark; on light themes they're just black.
+  const themeMeta = THEMES.find((t) => t.slug === theme);
+  const isDark = themeMeta ? hexLuminance(themeMeta.swatches[0]) < 0.5 : true;
   const active = (tokens.sprites || 0) > 0; // motion preset gates creatures on/off
   const count = active ? cfg.count : 0; // free roamers (the train is extra)
   const sizeMul = cfg.size;
@@ -407,6 +420,7 @@ export default function SootSprites() {
         const star = STAR_COLORS[i % STAR_COLORS.length];
         const blinkDur = (3.4 + (i % 6) * 0.7).toFixed(2);
         const blinkDelay = ((i * 0.37) % 5).toFixed(2);
+        const stepDur = 0.62 + (i % 4) * 0.11; // each sprite shuffles at its own pace
         return (
           <span
             key={i}
@@ -436,7 +450,33 @@ export default function SootSprites() {
                   <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="7" result="n" />
                   <feDisplacementMap in="SourceGraphic" in2="n" scale="5" />
                 </filter>
+                {/* soft luminous halo so the feet glow in the dark */}
+                <filter id={`sootGlow${i}`} x="-120%" y="-120%" width="340%" height="340%">
+                  <feGaussianBlur stdDeviation="1.7" result="b" />
+                  <feMerge>
+                    <feMergeNode in="b" />
+                    <feMergeNode in="b" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
               </defs>
+              {/* two little feet poking out the bottom — drawn before the body so
+                  the circle covers their tops and only the toes peek out. On dark
+                  themes they glow; on light themes they're plain black. */}
+              <g
+                filter={isDark ? `url(#sootGlow${i})` : undefined}
+                stroke={isDark ? "#8dffb4" : body}
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                fill="none"
+              >
+                <path className="soot-foot" d="M18 37 L17 44" style={{ animationDuration: `${stepDur}s` }} />
+                <path
+                  className="soot-foot"
+                  d="M26 37 L27 44"
+                  style={{ animationDuration: `${stepDur}s`, animationDelay: `-${(stepDur / 2).toFixed(2)}s` }}
+                />
+              </g>
               <g filter={`url(#hanabiSootFuzz${i})`}>
                 {/* highlight rim underlay (foreground colour via currentColor) */}
                 <path d="M12 13 L16 2.5 L20 13 Z M21 11 L25 1.5 L29 11 Z M29 14 L33 5 L36 15 Z" fill="currentColor" />
