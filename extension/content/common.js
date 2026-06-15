@@ -64,7 +64,10 @@
       }
     },
 
-    // Run `detect` now, on load, and whenever an SPA changes the URL.
+    // Run `detect` now, on load, and continuously thereafter. Some players
+    // (Netflix) render the title/episode overlay late and only flash it briefly —
+    // a one-shot probe misses it — so we re-probe on every tick and let report()
+    // de-dupe. The overlay is caught the moment it appears (e.g. when controls show).
     watch(detect) {
       const run = () => {
         try {
@@ -78,10 +81,9 @@
       setInterval(() => {
         if (location.href !== last) {
           last = location.href;
-          this._lastKey = null;
-          // give the SPA a moment to render the new view
-          setTimeout(run, 1200);
+          this._lastKey = null; // new view → allow a fresh detection
         }
+        run();
       }, 1500);
       window.addEventListener("load", run);
     },

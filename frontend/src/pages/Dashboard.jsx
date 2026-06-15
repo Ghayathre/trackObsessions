@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getStats, listActivity, listCategories } from "../lib/db";
+import { supabase } from "../lib/supabase";
+import { useAuth } from "../context/AuthContext";
 import { Link } from "react-router-dom";
 import { Card } from "../components/ui/card";
 import { TrendingUp, Eye, CheckCircle2, Bookmark, Sparkles, Timer } from "lucide-react";
@@ -23,6 +25,7 @@ function formatHours(h) {
 }
 
 export default function Dashboard() {
+  const { user } = useAuth();
   const [data, setData] = useState(null);
   const [activity, setActivity] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -35,6 +38,33 @@ export default function Dashboard() {
     setCategories(cats);
   };
   useEffect(() => { load(); }, []);
+
+  // Live-sync the summary (stats, "recently updated", activity) when a title changes
+  // server-side — e.g. the extension advancing progress. A single change touches
+  // several aggregates, so we just re-pull getStats/activity, debounced to coalesce
+  // bursts. RLS scopes events to this user; the filter trims traffic.
+  const loadRef = useRef(load);
+  loadRef.current = load;
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    let timer;
+    const channel = supabase
+      .channel("dashboard:titles")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "titles", filter: `user_id=eq.${user.id}` },
+        () => {
+          clearTimeout(timer);
+          timer = setTimeout(() => loadRef.current(), 400);
+        },
+      )
+      .subscribe();
+    return () => {
+      clearTimeout(timer);
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   // chart scale
   const maxHours = data ? Math.max(1, ...data.by_category.map((c) => c.hours)) : 1;

@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { listTitles, listCategories } from "../lib/db";
+import { supabase } from "../lib/supabase";
 import MediaCard from "../components/MediaCard";
 import AddTitleDialog from "../components/AddTitleDialog";
 import CategoryLinks from "../components/CategoryLinks";
@@ -50,6 +51,53 @@ export default function Category() {
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
+
+  // Mirror the latest state/handlers into refs so the Realtime callback (set up
+  // once per collection) always reads current values without re-subscribing.
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+  const filterRef = useRef(filter);
+  filterRef.current = filter;
+  const loadRef = useRef(load);
+  loadRef.current = load;
+
+  // Live-sync: the extension advances `progress` server-side (service-role), so the
+  // browser otherwise needs a refresh. Subscribe to Realtime changes on our titles
+  // and reflect them in place. RLS already scopes events to this user; the filter
+  // just trims traffic.
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    const channel = supabase
+      .channel(`titles:${id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "titles", filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          const { eventType, new: row, old } = payload;
+          if (eventType === "DELETE") {
+            setItems((cur) => cur.filter((i) => i.id !== old.id));
+            return;
+          }
+          const f = filterRef.current;
+          const belongs = row.category_id === id && (f === "all" || row.status === f);
+          const inList = itemsRef.current.some((i) => i.id === row.id);
+          if (!belongs) {
+            if (inList) setItems((cur) => cur.filter((i) => i.id !== row.id));
+          } else if (inList) {
+            setItems((cur) => cur.map((i) => (i.id === row.id ? { ...i, ...row } : i)));
+          } else {
+            // A title that newly belongs here (extension add, moved in, status now
+            // matches) — reload so ordering and the search filter stay correct.
+            loadRef.current();
+          }
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, user?.id]);
 
   const kind = cat?.kind === "reading" ? "reading" : "video";
   const onChange = (updated, deletedId) => {

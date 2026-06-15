@@ -69,6 +69,12 @@
       "run_at": "document_idle"
     },
     {
+      "matches": ["*://*.netflix.com/*"],
+      "js": ["content/netflix-inject.js"],
+      "run_at": "document_idle",
+      "world": "MAIN"
+    },
+    {
       "matches": ["*://www.webtoons.com/*"],
       "js": ["content/common.js", "content/webtoons.js"],
       "run_at": "document_idle"

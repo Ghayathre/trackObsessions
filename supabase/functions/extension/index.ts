@@ -85,6 +85,60 @@ Deno.serve(async (req) => {
     }
   }
 
+  // Resolve the target collection up front — needed both to auto-advance an
+  // already-tracked title and to auto-accept a brand-new one.
+  let cat: { id: string; name: string } | null = null;
+  if (catSlug) {
+    cat = (await admin.from("categories")
+      .select("id, name").eq("user_id", userId).eq("slug", catSlug).maybeSingle()).data;
+  }
+
+  // Auto-advance: if the user already tracks this title, move its episode forward
+  // right away. This happens regardless of the auto-accept setting (which only
+  // governs creating brand-new titles) and regardless of whether we resolved a
+  // collection — when a category hint is present (e.g. Crunchyroll) we scope the
+  // match to it for precision; when it's absent (Netflix sends none) we match by
+  // name across all the user's titles. progress only ever increases (Math.max),
+  // so re-watching an earlier episode never rewinds it.
+  let etQuery = admin.from("titles")
+    .select("id, progress, category_id")
+    .eq("user_id", userId)
+    .ilike("title", escapeLike(title));
+  if (cat) etQuery = etQuery.eq("category_id", cat.id);
+  const { data: etRows } = await etQuery.order("updated_at", { ascending: false }).limit(1);
+  const et = etRows?.[0];
+  if (et) {
+    const prev = et.progress ?? 0;
+    const next = episode !== null ? Math.max(prev, Number(episode)) : prev;
+    const tu: Record<string, unknown> = { source: "extension" };
+    if (next !== prev) tu.progress = next;
+    if (season !== null) tu.season = season;
+    await admin.from("titles").update(tu).eq("id", et.id);
+    // Don't leave a stale inbox card for a title we just advanced on our own.
+    await admin.from("suggestions")
+      .update({ status: "accepted", title_id: et.id, auto_accepted: true })
+      .eq("user_id", userId).eq("title", title).eq("status", "pending");
+    if (next !== prev) {
+      // Resolve the collection name for the log from the title's own category,
+      // since we may have matched without a category hint.
+      let catName = cat?.name ?? "";
+      let catId = cat?.id ?? et.category_id;
+      if (!catName) {
+        const { data: c } = await admin
+          .from("categories").select("name").eq("id", et.category_id).maybeSingle();
+        catName = c?.name ?? "";
+        catId = et.category_id;
+      }
+      await admin.from("activity").insert({
+        user_id: userId, type: "progress", title, title_id: et.id,
+        category_id: catId, category_name: catName,
+        extra: { from: prev, to: next, auto: true },
+      });
+    }
+    return json({ ok: true, title_id: et.id, updated: true, progress: next });
+  }
+
+  // Not tracked yet → fall back to the suggestion inbox (with dedup).
   // Dedup: existing pending suggestion with same title -> just update episode/season/cover.
   const { data: existing } = await admin
     .from("suggestions")
@@ -120,40 +174,25 @@ Deno.serve(async (req) => {
   if (sugErr || !sug) return json({ detail: "Could not create suggestion" }, 500);
   const suggestionId = sug.id;
 
-  // Auto-accept policy: if the user opted in AND we resolved a category, convert to a title.
+  // Auto-accept policy: create a brand-new title from the suggestion if the user
+  // opted in and we resolved a collection. (Advancing an already-tracked title is
+  // handled above, independent of this setting.)
   const { data: profile } = await admin
     .from("profiles").select("auto_accept").eq("id", userId).maybeSingle();
-  if (profile?.auto_accept && catSlug) {
-    const { data: cat } = await admin
-      .from("categories").select("id, name").eq("user_id", userId).eq("slug", catSlug).maybeSingle();
-    if (cat) {
-      const { data: et } = await admin
-        .from("titles").select("id, progress")
-        .eq("user_id", userId).eq("category_id", cat.id)
-        .ilike("title", escapeLike(title)).maybeSingle();
-      let titleId: string;
-      if (et) {
-        const tu: Record<string, unknown> = { source: "extension" };
-        if (episode !== null) tu.progress = Math.max(et.progress ?? 0, Number(episode));
-        if (season !== null) tu.season = season;
-        await admin.from("titles").update(tu).eq("id", et.id);
-        titleId = et.id;
-      } else {
-        const { data: nt } = await admin
-          .from("titles").insert({
-            user_id: userId, category_id: cat.id, title, status: "watching",
-            progress: episode ?? 0, season, cover_url: coverUrl, source: "extension",
-          }).select("id").single();
-        titleId = nt!.id;
-      }
-      await admin.from("suggestions")
-        .update({ status: "accepted", title_id: titleId, auto_accepted: true }).eq("id", suggestionId);
-      await admin.from("activity").insert({
-        user_id: userId, type: "extension_add", title, title_id: titleId,
-        category_id: cat.id, category_name: cat.name, extra: { auto: true },
-      });
-      return json({ ok: true, suggestion_id: suggestionId, auto_accepted: true, title_id: titleId });
-    }
+  if (profile?.auto_accept && cat) {
+    const { data: nt } = await admin
+      .from("titles").insert({
+        user_id: userId, category_id: cat.id, title, status: "watching",
+        progress: episode ?? 0, season, cover_url: coverUrl, source: "extension",
+      }).select("id").single();
+    const titleId = nt!.id;
+    await admin.from("suggestions")
+      .update({ status: "accepted", title_id: titleId, auto_accepted: true }).eq("id", suggestionId);
+    await admin.from("activity").insert({
+      user_id: userId, type: "extension_add", title, title_id: titleId,
+      category_id: cat.id, category_name: cat.name, extra: { auto: true },
+    });
+    return json({ ok: true, suggestion_id: suggestionId, auto_accepted: true, title_id: titleId });
   }
 
   return json({ ok: true, suggestion_id: suggestionId });
