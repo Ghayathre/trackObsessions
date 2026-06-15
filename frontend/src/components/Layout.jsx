@@ -5,7 +5,7 @@ import { listCategories, listSuggestions, createCategory, deleteCategory } from 
 import {
   Home, Settings, Plus, LogOut, Sparkles, Bell, Flame, Menu, GripVertical,
   ChevronLeft, ChevronRight, ChevronDown,
-  Clapperboard, Heart, BookOpen, Library, Hash, Activity as ActivityIcon
+  Clapperboard, Heart, BookOpen, Library, Hash, Activity as ActivityIcon, History
 } from "lucide-react";
 import { Button } from "./ui/button";
 import HanabiInbox from "./HanabiInbox";
@@ -338,6 +338,7 @@ function VerticalBar({ cats, pending, user, dock, onDragStart, onInbox, onLogout
 
       <nav className={`flex flex-col gap-1 ${collapsed ? "px-2 mt-2" : "px-3"}`}>
         <SideLink to="/" icon={<Home className="w-4 h-4" />} label="Dashboard" testid="nav-dashboard" onClick={onNavigate} collapsed={collapsed} />
+        <SideLink to="/recently-watched" icon={<History className="w-4 h-4" />} label="Recently watched" testid="nav-recently-watched" onClick={onNavigate} collapsed={collapsed} />
         <SideLink to="/activity" icon={<ActivityIcon className="w-4 h-4" />} label="Activity" testid="nav-activity" onClick={onNavigate} collapsed={collapsed} />
         <div className={collapsed ? "px-0.5 py-1 grid place-items-center" : "px-2 py-1.5"}>
           <SnapToAddDialog categories={cats} onAdded={onSnapAdded} compact={collapsed} />
@@ -383,6 +384,7 @@ function HorizontalBar({ cats, pending, user, dock, onDragStart, onInbox, onLogo
 
       <nav className="flex items-center gap-1 shrink-0">
         <SideLink to="/" icon={<Home className="w-4 h-4" />} label="Dashboard" testid="nav-dashboard" onClick={onNavigate} compact />
+        <SideLink to="/recently-watched" icon={<History className="w-4 h-4" />} label="Recently watched" testid="nav-recently-watched" onClick={onNavigate} compact />
         <SideLink to="/activity" icon={<ActivityIcon className="w-4 h-4" />} label="Activity" testid="nav-activity" onClick={onNavigate} compact />
         <SnapToAddDialog categories={cats} onAdded={onSnapAdded} />
         <InboxButton pending={pending} onInbox={onInbox} onNavigate={onNavigate} className="gap-2 px-3 py-2" compact />

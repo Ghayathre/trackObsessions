@@ -76,6 +76,7 @@ Deno.serve(async (req) => {
   const episode = payload.episode ?? null;
   const season = payload.season ?? null;
   const coverUrl = (payload.cover_url as string) || "";
+  const sourceUrl = (payload.source_url as string) || "";
 
   let catSlug: string | null = (payload.category_slug as string) ?? null;
   if (!catSlug && payload.category_hint) {
@@ -113,6 +114,7 @@ Deno.serve(async (req) => {
     const tu: Record<string, unknown> = { source: "extension" };
     if (next !== prev) tu.progress = next;
     if (season !== null) tu.season = season;
+    if (sourceUrl) tu.source_url = sourceUrl; // keep the resume link on the latest episode
     await admin.from("titles").update(tu).eq("id", et.id);
     // Don't leave a stale inbox card for a title we just advanced on our own.
     await admin.from("suggestions")
@@ -184,6 +186,7 @@ Deno.serve(async (req) => {
       .from("titles").insert({
         user_id: userId, category_id: cat.id, title, status: "watching",
         progress: episode ?? 0, season, cover_url: coverUrl, source: "extension",
+        source_url: sourceUrl,
       }).select("id").single();
     const titleId = nt!.id;
     await admin.from("suggestions")

@@ -6,7 +6,7 @@ import { fetchDetail, searchMetadata } from "./metadata";
 
 const TITLE_COLS =
   "id, user_id, category_id, title, status, progress, total, season, rating, notes, " +
-  "cover_url, source, external_id, external_source, synopsis, year, country, created_at, updated_at";
+  "cover_url, source, source_url, external_id, external_source, synopsis, year, country, created_at, updated_at";
 const PUBLIC_TITLE_COLS =
   "id, category_id, title, status, progress, total, season, rating, cover_url, " +
   "external_source, synopsis, year, country, updated_at";
@@ -164,6 +164,18 @@ export async function listTitles({ categoryId, status, q } = {}) {
   return unwrap(await query.order("updated_at", { ascending: false }));
 }
 
+// Most recently updated titles across every collection — drives the
+// "Recently watched" page. `updated_at` is bumped each time the extension
+// reports an episode, so this reflects real watch recency.
+export async function listRecentlyWatched(limit = 60) {
+  const userId = await uid();
+  const lim = Math.min(Math.max(limit, 1), 200);
+  return unwrap(
+    await supabase.from("titles").select(TITLE_COLS).eq("user_id", userId)
+      .order("updated_at", { ascending: false }).limit(lim),
+  );
+}
+
 export async function createTitle(payload) {
   const userId = await uid();
   const row = unwrap(
@@ -179,6 +191,7 @@ export async function createTitle(payload) {
       notes: payload.notes || "",
       cover_url: payload.cover_url || "",
       source: payload.source || "manual",
+      source_url: payload.source_url || "",
       external_id: payload.external_id ?? null,
       external_source: payload.external_source ?? null,
       synopsis: payload.synopsis || "",
@@ -292,6 +305,7 @@ export async function actOnSuggestion(id, action, categoryId) {
     const update = { source: "extension" };
     if (sug.episode != null) update.progress = Math.max(existing.progress || 0, sug.episode);
     if (sug.season != null) update.season = sug.season;
+    if (sug.source_url) update.source_url = sug.source_url;
     // Backfill metadata only if this title was never linked to a source.
     if (meta && !existing.external_source) {
       Object.assign(update, {
@@ -311,7 +325,7 @@ export async function actOnSuggestion(id, action, categoryId) {
       total: meta?.total ?? null, synopsis: meta?.synopsis || "",
       year: meta?.year || "", country: meta?.country || "",
       external_id: meta?.external_id ?? null, external_source: meta?.external_source ?? null,
-      source: "extension",
+      source: "extension", source_url: sug.source_url || "",
     }).select("id").single());
     titleId = row.id;
   }

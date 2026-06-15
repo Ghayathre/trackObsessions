@@ -10,6 +10,7 @@ import Dashboard from "@/pages/Dashboard";
 import Category from "@/pages/Category";
 import Settings from "@/pages/Settings";
 import Activity from "@/pages/Activity";
+import RecentlyWatched from "@/pages/RecentlyWatched";
 import PublicProfile from "@/pages/PublicProfile";
 import Layout from "@/components/Layout";
 import AmbientBackground from "@/components/AmbientBackground";
@@ -47,6 +48,7 @@ function AppRoutes() {
       <Route path="/u/:username/c/:slug" element={<PublicProfile />} />
       <Route element={<ProtectedLayout />}>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/recently-watched" element={<RecentlyWatched />} />
         <Route path="/activity" element={<Activity />} />
         <Route path="/c/:id" element={<Category />} />
         <Route path="/settings" element={<Settings />} />
