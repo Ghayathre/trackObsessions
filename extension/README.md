@@ -49,6 +49,7 @@ Hanabi**. If nothing matches you can still submit the title you typed.
 |------|----------|
 | Crunchyroll | Anime |
 | HiAnime / Aniwatch | Anime |
+| Miruro | Anime |
 | MangaDex | Manga |
 | Mangago | Manga |
 | Webtoons | Manga |

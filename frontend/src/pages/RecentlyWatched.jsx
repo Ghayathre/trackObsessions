@@ -20,6 +20,7 @@ function platformFromUrl(url) {
     [/netflix\./, "Netflix"],
     [/crunchyroll\./, "Crunchyroll"],
     [/(hianime|aniwatch)\./, "HiAnime"],
+    [/miruro\./, "Miruro"],
     [/mangadex\./, "MangaDex"],
     [/mangago\./, "Mangago"],
     [/webtoons\./, "Webtoons"],

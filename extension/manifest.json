@@ -37,6 +37,9 @@
     "*://*.dramacool9.co/*",
     "*://*.dramacool.cr/*",
     "*://*.netflix.com/*",
+    "*://*.miruro.to/*",
+    "*://*.miruro.tv/*",
+    "*://*.miruro.online/*",
     "*://www.webtoons.com/*",
     "*://kisskh.co/*",
     "*://www.mangago.me/*",
@@ -73,6 +76,11 @@
       "js": ["content/netflix-inject.js"],
       "run_at": "document_idle",
       "world": "MAIN"
+    },
+    {
+      "matches": ["*://*.miruro.to/*", "*://*.miruro.tv/*", "*://*.miruro.online/*"],
+      "js": ["content/common.js", "content/miruro.js"],
+      "run_at": "document_idle"
     },
     {
       "matches": ["*://www.webtoons.com/*"],
