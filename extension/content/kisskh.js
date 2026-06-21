@@ -11,15 +11,13 @@
 //      slug; otherwise it's stale and we wait. The episode number comes from the
 //      path route (reliable), confirmed against the title.
 __hanabi.watch(() => {
-  const route = location.pathname.match(/\/(Drama|Movie|Anime)\/([^/]+)\/Episode-(\d+)/i);
+  const route = location.pathname.match(/\/(?:Drama|Movie|Anime)\/([^/]+)\/Episode-(\d+)/i);
   if (!route) return; // not an episode page → don't track
-  const type = route[1].toLowerCase();
-  const slug = route[2];
-  const episode = parseInt(route[3], 10);
-
-  // KissKH hosts anime as well as Asian dramas — route it by the path segment
-  // (/Anime/… vs /Drama|Movie/…) so anime doesn't land in the K-drama collection.
-  const hint = type === "anime" ? "anime" : "kdrama";
+  const slug = route[1];
+  const episode = parseInt(route[2], 10);
+  // KissKH files anime under /Drama/ too, so the path can't tell anime from
+  // drama — default everything to the K-drama collection and move the occasional
+  // anime by hand. (See README: "K-Dramas (reclassify if needed)".)
 
   const h = window.__hanabi;
   const raw = (document.title || "").replace(/\s*\|\s*kisskh\s*$/i, "").trim();
@@ -52,6 +50,6 @@ __hanabi.watch(() => {
     title: cleanTitle,
     episode,
     cover_url: cover,
-    category_hint: hint,
+    category_hint: "kdrama",
   });
 });
