@@ -1,31 +1,38 @@
 // KissKH → Asian dramas (defaults to a K-drama hint; reclassify in the inbox).
-// KissKH is an Angular SPA whose page <title> stays live across navigation and
-// carries BOTH the show and the episode, e.g.
-//   "Never-Ending Summer (2026) Episode 1 | kisskh"
-// The og tags are generic and the ?ep= query param is an internal DB id (not the
-// episode number), so document.title is the source of truth; the path's
-// "/Episode-N" is only a cross-check.
+// KissKH is an Angular SPA. Its watch URLs look like
+//   /Drama/Never-Ending-Summer--2026-/Episode-2?id=…&ep=…
+// and the page <title> carries the show + episode ("… Episode 2 | kisskh").
+// Two hazards we guard against:
+//   1. We must fire ONLY on a real episode page (/Episode-N) — never on a
+//      browse/detail page like /Drama/Some-Show, or merely clicking into a show
+//      would track it.
+//   2. document.title can lag a step behind navigation (still showing the show
+//      you came from). So we only report when the title's show matches the URL
+//      slug; otherwise it's stale and we wait. The episode number comes from the
+//      path route (reliable), confirmed against the title.
 __hanabi.watch(() => {
-  if (!/\/(Drama|Movie|Anime|Episode)/i.test(location.pathname)) return;
-  const h = window.__hanabi;
+  const route = location.pathname.match(/\/(?:Drama|Movie|Anime)\/([^/]+)\/Episode-(\d+)/i);
+  if (!route) return; // not an episode page → don't track
+  const slug = route[1];
+  const episode = parseInt(route[2], 10);
 
-  // Strip the " | kisskh" suffix, then split the show from the "Episode N" tail.
+  const h = window.__hanabi;
   const raw = (document.title || "").replace(/\s*\|\s*kisskh\s*$/i, "").trim();
   if (!raw || /^kisskh$/i.test(raw)) return; // title not painted yet
 
   const title = raw.replace(/\s*Episode\s*\d+.*$/i, "").trim();
   if (!title) return;
 
-  // Episode from the live title; fall back to the "/Episode-N" path segment.
-  let episode =
-    h.num(raw, /Episode\s*(\d+)/i) ??
-    h.num(location.pathname, /Episode-(\d+)/i);
-
-  // For an episodic page we must have a number — if it isn't parsed yet, wait
-  // rather than raise an "undetected episode" inbox card. A movie (no "Episode"
-  // anywhere) legitimately has no number and is reported as-is.
-  const episodic = /Episode/i.test(raw) || /\/Episode-/i.test(location.pathname);
-  if (episodic && episode == null) return;
+  // Stale-title guard: the document title's show must be the same as the URL
+  // slug, and its episode (if present) must match the route. If not, the SPA
+  // hasn't repainted the title yet — wait for the next tick rather than track
+  // the wrong show.
+  const norm = (s) => (s || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const a = norm(title);
+  const b = norm(slug);
+  if (!(a === b || a.includes(b) || b.includes(a))) return;
+  const titleEp = h.num(raw, /Episode\s*(\d+)/i);
+  if (titleEp != null && titleEp !== episode) return; // title still on a different episode
 
   // KissKH's og:image is a generic PWA icon, not a poster — skip it (enrichment
   // pulls a real cover on accept). Only keep an absolute, non-icon image.
