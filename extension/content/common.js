@@ -28,9 +28,12 @@
     },
 
     // Strip noisy site suffixes like " - Crunchyroll" / " | MangaDex".
+    // The separator must be whitespace-padded so we only catch real delimiters
+    // and never an intra-word hyphen — e.g. "Never-Ending Summer" or
+    // "Spider-Man" must stay intact (a bare "-" rule chopped them to "Never").
     cleanTitle(t) {
       return (t || "")
-        .replace(/\s*[|\-–—]\s*[^|\-–—]+$/, "")
+        .replace(/\s+[|\-–—]\s+[^|\-–—]+$/, "")
         .replace(/watch\s+/i, "")
         .trim();
     },
