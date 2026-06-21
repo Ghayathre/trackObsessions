@@ -54,11 +54,31 @@ async function enrichForCategory(query, category) {
     if (!results.length) return null;
     const norm = (s) => (s || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
     const q = norm(query);
-    return (
-      results.find((r) => norm(r.title) === q) ||
-      results.find((r) => norm(r.title).includes(q) || q.includes(norm(r.title))) ||
-      results[0]
-    );
+
+    // Exact (normalised) title wins outright.
+    const exact = results.find((r) => norm(r.title) === q);
+    if (exact) return exact;
+
+    // Otherwise require a genuine word-overlap match — NEVER fall back to
+    // results[0], which silently attaches an unrelated show's cover/synopsis/
+    // episode count to a title the catalogue simply doesn't have (e.g. a brand-
+    // new Thai drama searched against TVmaze).
+    const words = (s) => norm(s).match(/[a-z0-9]+/gi)?.filter((w) => w.length > 1) || [];
+    const qWords = words(query);
+    if (!qWords.length) return null;
+    const overlap = (cand) => {
+      const set = new Set(words(cand));
+      let hit = 0;
+      for (const w of qWords) if (set.has(w)) hit++;
+      return hit / Math.max(qWords.length, set.size || 1);
+    };
+    let best = null;
+    let bestScore = 0;
+    for (const r of results) {
+      const s = overlap(r.title);
+      if (s > bestScore) { bestScore = s; best = r; }
+    }
+    return bestScore >= 0.5 ? best : null;
   } catch {
     return null;
   }

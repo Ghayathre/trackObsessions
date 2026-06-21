@@ -34,13 +34,17 @@ __hanabi.watch(() => {
   const titleEp = h.num(raw, /Episode\s*(\d+)/i);
   if (titleEp != null && titleEp !== episode) return; // title still on a different episode
 
+  // KissKH appends a disambiguating year, e.g. "Never-Ending Summer (2026)";
+  // drop it for a clean, catalogue-searchable name.
+  const cleanTitle = title.replace(/\s*\(\d{4}\)\s*$/, "").trim();
+
   // KissKH's og:image is a generic PWA icon, not a poster — skip it (enrichment
   // pulls a real cover on accept). Only keep an absolute, non-icon image.
   const og = h.meta("og:image");
   const cover = /^https?:\/\//.test(og) && !/\/icons?\//i.test(og) ? og : "";
 
   h.report({
-    title,
+    title: cleanTitle,
     episode,
     cover_url: cover,
     category_hint: "kdrama",
