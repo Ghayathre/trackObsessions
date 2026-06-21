@@ -252,6 +252,34 @@ export async function refreshTitle(id) {
 }
 
 // ---------------- Stats / activity ----------------
+// Backfill catalogue metadata for a title that has no linked source yet — e.g.
+// one auto-added by the browser extension (the edge function creates it server-
+// side and can't reach the client-side catalogues). Looks the title up by name
+// in its category's catalogue, pulls full detail, and fills only the fields that
+// are still empty (non-destructive — never clobbers an existing cover/progress).
+export async function enrichTitle(id) {
+  const t = unwrap(await supabase.from("titles").select(TITLE_COLS).eq("id", id).single());
+  const cat = (await supabase.from("categories")
+    .select("id, slug, kind, name").eq("id", t.category_id).maybeSingle()).data;
+  const match = await enrichForCategory(t.title, cat);
+  if (!match) throw new Error("No catalogue match found for this title.");
+
+  // Prefer full detail when the match links to a source; fall back to the search hit.
+  let meta = match;
+  if (match.external_source && match.external_id) {
+    const detail = await fetchDetail(match.external_source, match.external_id);
+    if (detail) meta = { ...match, ...detail };
+  }
+
+  const isEmpty = (v) => v === null || v === undefined || v === "";
+  const update = {};
+  for (const k of ["cover_url", "synopsis", "total", "year", "country", "external_id", "external_source"]) {
+    if (isEmpty(t[k]) && !isEmpty(meta[k])) update[k] = meta[k];
+  }
+  if (!Object.keys(update).length) throw new Error("No extra details available for this title.");
+  return unwrap(await supabase.from("titles").update(update).eq("id", id).select(TITLE_COLS).single());
+}
+
 export async function getStats() {
   return unwrap(await supabase.rpc("get_stats"));
 }

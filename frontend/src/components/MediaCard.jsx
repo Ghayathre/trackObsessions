@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "./ui/card";
 import { Star, Plus, Minus, Trash2, RefreshCw, Globe, Calendar, Hash } from "lucide-react";
 import { motion } from "framer-motion";
 import { useMotion } from "../context/ThemeContext";
-import { refreshTitle, updateTitle, deleteTitle } from "../lib/db";
+import { refreshTitle, enrichTitle, updateTitle, deleteTitle } from "../lib/db";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -46,6 +46,10 @@ export default function MediaCard({ item, onChange, kind = "video", categories =
   const [draft, setDraft] = useState(item);
   const [coverFailed, setCoverFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [enriching, setEnriching] = useState(false);
+  // Auto-enrich an unlinked title at most once per mount (don't re-hit catalogues
+  // every time the dialog reopens or after a failed lookup).
+  const autoEnriched = useRef(false);
 
   // reset cover failure when item changes
   useEffect(() => { setCoverFailed(false); }, [item.cover_url]);
@@ -63,6 +67,32 @@ export default function MediaCard({ item, onChange, kind = "video", categories =
       setRefreshing(false);
     }
   };
+
+  // Pull synopsis / episode count for a title that was auto-added without a
+  // catalogue link (e.g. by the extension). Non-destructive backfill.
+  const fetchDetails = async ({ silent = false } = {}) => {
+    setEnriching(true);
+    try {
+      const data = await enrichTitle(item.id);
+      onChange?.(data);
+      setDraft(data);
+      if (!silent) toast.success("Details added");
+    } catch (err) {
+      if (!silent) toast.error(err.message || "Could not fetch details");
+    } finally {
+      setEnriching(false);
+    }
+  };
+
+  // When an unlinked title's card is opened, try to fill its details once so the
+  // synopsis & episode count appear without the user having to ask.
+  useEffect(() => {
+    if (open && !item.external_id && !autoEnriched.current && !enriching) {
+      autoEnriched.current = true;
+      fetchDetails({ silent: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, item.external_id]);
 
   const inc = async (delta) => {
     const next = Math.max(0, (item.progress || 0) + delta);
@@ -180,7 +210,7 @@ export default function MediaCard({ item, onChange, kind = "video", categories =
               ) : (
                 <div className="w-full aspect-[2/3] rounded-lg bg-muted grid place-items-center text-xs p-2 text-center border border-border">{item.title}</div>
               )}
-              {item.external_id && item.external_source && (
+              {item.external_id && item.external_source ? (
                 <Button
                   size="sm"
                   variant="outline"
@@ -191,6 +221,18 @@ export default function MediaCard({ item, onChange, kind = "video", categories =
                 >
                   <RefreshCw className={`w-3 h-3 mr-1 ${refreshing ? "animate-spin" : ""}`} />
                   {refreshing ? "Refreshing…" : "Refresh details"}
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full text-xs"
+                  onClick={() => fetchDetails()}
+                  disabled={enriching}
+                  data-testid={`fetch-${item.id}`}
+                >
+                  <RefreshCw className={`w-3 h-3 mr-1 ${enriching ? "animate-spin" : ""}`} />
+                  {enriching ? "Fetching…" : "Fetch details"}
                 </Button>
               )}
             </div>
@@ -207,7 +249,11 @@ export default function MediaCard({ item, onChange, kind = "video", categories =
                 <p className="text-xs text-muted-foreground italic">No synopsis stored yet. Click "Refresh details" to fetch it.</p>
               )}
               {!item.external_id && !item.synopsis && (
-                <p className="text-xs text-muted-foreground italic">This title was added manually. Re-add via search to pull in synopsis & episode count.</p>
+                <p className="text-xs text-muted-foreground italic">
+                  {enriching
+                    ? "Looking up synopsis & episode count…"
+                    : "Auto-added without details. Click \"Fetch details\" to pull in the synopsis & episode count."}
+                </p>
               )}
             </div>
           </div>
