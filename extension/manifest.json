@@ -42,6 +42,11 @@
     "*://*.miruro.online/*",
     "*://www.webtoons.com/*",
     "*://kisskh.co/*",
+    "*://kisskh.do/*",
+    "*://kisskh.me/*",
+    "*://kisskh.id/*",
+    "*://kisskh.asia/*",
+    "*://kisskh.org/*",
     "*://www.mangago.me/*",
     "*://www.goodreads.com/*"
   ],
@@ -88,7 +93,7 @@
       "run_at": "document_idle"
     },
     {
-      "matches": ["*://kisskh.co/*"],
+      "matches": ["*://kisskh.co/*", "*://kisskh.do/*", "*://kisskh.me/*", "*://kisskh.id/*", "*://kisskh.asia/*", "*://kisskh.org/*"],
       "js": ["content/common.js", "content/kisskh.js"],
       "run_at": "document_idle"
     },
